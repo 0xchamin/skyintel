@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenSkyAI</title>
+    <script src="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Cesium.js"></script>
+    <link href="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+    <style>
+        html, body, #cesiumContainer {
+            margin: 0; padding: 0;
+            width: 100%; height: 100%;
+            overflow: hidden;
+            background: #000;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+
+        /* ── Toolbar ─────────────────────────────── */
+        #toolbar {
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 48px;
+            background: rgba(20, 20, 30, 0.92);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            z-index: 200;
+            gap: 8px;
+        }
+        #toolbar .brand {
+            font-size: 15px;
+            font-weight: 700;
+            color: #0ff;
+            margin-right: 16px;
+            letter-spacing: 1px;
+        }
+        #toolbar .divider {
+            width: 1px;
+            height: 24px;
+            background: rgba(255,255,255,0.15);
+            margin: 0 8px;
+        }
+        #toolbar .section-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.4);
+            letter-spacing: 1px;
+            margin-right: 6px;
+        }
+
+        /* ── Toggle chips ────────────────────────── */
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.2s;
+            border: 1px solid rgba(255,255,255,0.15);
+            color: #fff;
+        }
+        .chip.active {
+            border-color: currentColor;
+            background: rgba(255,255,255,0.1);
+        }
+        .chip:not(.active) {
+            opacity: 0.4;
+        }
+        .chip .dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        /* ── Detail panel ────────────────────────── */
+        #detailPanel {
+            position: absolute;
+            top: 48px; right: 0; bottom: 0;
+            width: 320px;
+            background: rgba(20, 20, 30, 0.94);
+            backdrop-filter: blur(12px);
+            border-left: 1px solid rgba(255,255,255,0.1);
+            z-index: 150;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+            overflow-y: auto;
+            color: #fff;
+        }
+        #detailPanel.open {
+            transform: translateX(0);
+        }
+        #detailClose {
+            position: absolute;
+            top: 12px; right: 12px;
+            background: rgba(255,255,255,0.1);
+            border: none;
+            color: #fff;
+            font-size: 18px;
+            width: 32px; height: 32px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+        #detailClose:hover {
+            background: rgba(255,255,255,0.2);
+        }
+        #detailContent {
+            padding: 16px;
+        }
+
+        .detail-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
+            padding-right: 40px;
+        }
+        .detail-title {
+            font-size: 18px;
+            font-weight: 700;
+        }
+        .detail-badge {
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 8px;
+            letter-spacing: 0.5px;
+        }
+        .detail-section {
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+        .detail-section:last-child {
+            border-bottom: none;
+        }
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            font-size: 13px;
+        }
+        .detail-label {
+            color: rgba(255,255,255,0.5);
+        }
+        .detail-value {
+            color: #fff;
+            font-weight: 500;
+            text-align: right;
+        }
+        /* ── Fly-to button ───────────────────────── */
+        .flyto-btn {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 12px;
+            background: rgba(0, 255, 255, 0.1);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            color: #0ff;
+            font-size: 13px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .flyto-btn:hover {
+            background: rgba(0, 255, 255, 0.2);
+            border-color: #0ff;
+        }
+        .back-btn {
+            width: calc(100% - 32px);
+            margin: 12px 16px 0;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #fff;
+            font-size: 13px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        /* ── Status bar ──────────────────────────── */
+        #statusBar {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(20, 20, 30, 0.85);
+            color: #fff;
+            padding: 8px 24px;
+            border-radius: 20px;
+            font-size: 13px;
+            letter-spacing: 0.5px;
+            z-index: 100;
+            pointer-events: none;
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            gap: 16px;
+        }
+        .sb-item { opacity: 0.9; }
+        .sb-mil { color: #ef5350; }
+        .sb-prv { color: #CE93D8; }
+
+        /* ── Loading ─────────────────────────────── */
+        #loadingOverlay {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            color: #0ff;
+            font-size: 18px;
+            z-index: 300;
+            text-align: center;
+        }
+        #loadingOverlay .spinner {
+            display: inline-block;
+            width: 24px; height: 24px;
+            border: 3px solid rgba(0,255,255,0.3);
+            border-top-color: #0ff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 8px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .cesium-credit-logoContainer { display: none !important; }
+    </style>
+</head>
+<body>
+    <div id="cesiumContainer"></div>
+
+    <!-- Toolbar -->
+    <div id="toolbar">
+        <span class="brand">🔭 OPENSKYAI</span>
+        <div class="divider"></div>
+
+        <span class="section-label">Flights</span>
+        <span class="chip active" data-type="flight" data-value="commercial" style="color:#fff">
+            <span class="dot" style="background:#fff"></span> Commercial
+        </span>
+        <span class="chip active" data-type="flight" data-value="military" style="color:#ef5350">
+            <span class="dot" style="background:#ef5350"></span> Military
+        </span>
+        <span class="chip active" data-type="flight" data-value="private" style="color:#CE93D8">
+            <span class="dot" style="background:#CE93D8"></span> Private
+        </span>
+
+        <div class="divider"></div>
+
+        <span class="section-label">Satellites</span>
+        <span class="chip active" data-type="sat" data-value="iss" style="color:#FFD600">
+            <span class="dot" style="background:#FFD600"></span> ISS
+        </span>
+        <span class="chip active" data-type="sat" data-value="military" style="color:#ef5350">
+            <span class="dot" style="background:#ef5350"></span> Military
+        </span>
+        <span class="chip active" data-type="sat" data-value="weather" style="color:#00BFFF">
+            <span class="dot" style="background:#00BFFF"></span> Weather
+        </span>
+        <span class="chip active" data-type="sat" data-value="nav" style="color:#00E676">
+            <span class="dot" style="background:#00E676"></span> Nav
+        </span>
+        <span class="chip active" data-type="sat" data-value="science" style="color:#FF9800">
+            <span class="dot" style="background:#FF9800"></span> Science
+        </span>
+        <span class="chip" data-type="sat" data-value="starlink" style="color:#6495ED">
+            <span class="dot" style="background:#6495ED"></span> Starlink
+        </span>
+    </div>
+
+    <!-- Detail panel -->
+    <div id="detailPanel">
+        <button id="detailClose">✕</button>
+        <button id="backBtn" class="back-btn" style="display:none" onclick="flyBack()">⬅ Return to overview</button>
+
+        <div id="detailContent"></div>
+    </div>
+
+    <!-- Status bar -->
+    <div id="statusBar">
+        <span id="flightStatusBar" class="sb-item">✈ 0</span>
+        <span id="satStatusBar" class="sb-item">🛰 0</span>
+    </div>
+
+    <!-- Loading -->
+    <div id="loadingOverlay">
+        <div class="spinner"></div>
+        <div>🔭 Loading…</div>
+    </div>
+
+    <script src="/static/flights.js"></script>
+    <script src="/static/satellites.js"></script>
+    <script src="/static/detail.js"></script>
+    <script>
+        const viewer = new Cesium.Viewer("cesiumContainer", {
+            imageryProvider: false,
+            baseLayerPicker: false,
+            geocoder: false,
+            homeButton: false,
+            sceneModePicker: false,
+            navigationHelpButton: false,
+            animation: false,
+            timeline: false,
+            fullscreenButton: false,
+            vrButton: false,
+            infoBox: false,
+            selectionIndicator: false,
+            creditContainer: document.createElement("div"),
+        });
+
+        viewer.imageryLayers.addImageryProvider(
+            new Cesium.UrlTemplateImageryProvider({
+                url: "https://basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png",
+                credit: new Cesium.Credit("© CARTO © OpenStreetMap contributors"),
+            })
+        );
+
+        viewer.scene.globe.enableLighting = true;
+        viewer.scene.skyAtmosphere.show = true;
+        viewer.scene.fog.enabled = true;
+
+        viewer.camera.setView({
+            destination: Cesium.Cartesian3.fromDegrees(10, 20, 25000000),
+            orientation: {
+                heading: Cesium.Math.toRadians(0),
+                pitch: Cesium.Math.toRadians(-90),
+                roll: 0,
+            },
+        });
+
+        // Toggle chips
+        document.querySelectorAll(".chip").forEach(chip => {
+            chip.addEventListener("click", () => {
+                chip.classList.toggle("active");
+                const isActive = chip.classList.contains("active");
+                const type = chip.dataset.type;
+                const value = chip.dataset.value;
+
+                if (type === "flight") {
+                    setFlightToggle(value, isActive, viewer);
+                } else if (type === "sat") {
+                    setSatToggle(value, isActive, viewer);
+                }
+            });
+        });
+
+        // Init detail panel
+        initDetailPanel(viewer);
+
+        // Start tracking
+        Promise.all([
+            startFlightTracking(viewer),
+            startSatelliteTracking(viewer),
+        ]).then(() => {
+            document.getElementById("loadingOverlay").style.display = "none";
+        });
+    </script>
+</body>
+</html>

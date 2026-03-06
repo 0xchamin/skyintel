@@ -1,0 +1,1 @@
+"""OpenSkyAI web UI."""
