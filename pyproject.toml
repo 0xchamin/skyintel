@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "osai"
+name = "skyintel"
 version = "1.0.0"
 description = "Self-hosted MCP server and tactical web app for real-time flight, military aircraft, and satellite tracking with AI-powered queries and an immersive 3D globe."
 readme = "README.md"
@@ -45,7 +45,7 @@ chat = ["litellm>=1.80.0"]
 dev = ["pytest", "pytest-asyncio", "ruff", "coverage"]
 
 [project.scripts]
-osai = "osai.cli:app"
+skyintel = "skyintel.cli:app"
 
 [project.urls]
 Homepage = "https://github.com/youruser/osai"

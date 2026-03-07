@@ -4,7 +4,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_prefix="OSAI_",
+        env_prefix="SKYINTEL_",
         env_file=".env",
         env_file_encoding="utf-8",
         extra="forbid",
@@ -15,7 +15,9 @@ class Settings(BaseSettings):
     port: int = 9096
 
     # Database
-    db_path: Path = Path.home() / ".osai" / "osai.db"
+    #db_path: Path = Path.home() / ".osai" / "osai.db"
+    db_path: Path = Path.home() / ".skyintel" / "skyintel.db"
+
 
     # OpenSky Network (OAuth2)
     opensky_client_id: str | None = None
