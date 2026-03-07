@@ -13,7 +13,7 @@ console = Console()
 @app.command()
 def status():
     """Show OpenSkyAI configuration and system status."""
-    from osai.config import get_settings
+    from skyintel.config import get_settings
 
     settings = get_settings()
 
@@ -44,7 +44,7 @@ def serve(
     """Start the OpenSkyAI server (MCP + REST + Web UI)."""
     import uvicorn
     import logging
-    from osai.config import get_settings
+    from skyintel.config import get_settings
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 
@@ -64,9 +64,9 @@ def serve(
 def init():
     """Initialise the database (creates ~/.osai/osai.db)."""
     import asyncio
-    from osai.config import get_settings
-    from osai.storage.database import get_db, close_db
-    from osai.storage.migrations import run_migrations
+    from skyintel.config import get_settings
+    from skyintel.storage.database import get_db, close_db
+    from skyintel.storage.migrations import run_migrations
 
     async def _init():
         settings = get_settings()
@@ -81,7 +81,7 @@ def init():
 @app.command()
 def config():
     """Open or display the current .env configuration."""
-    from osai.config import get_settings
+    from skyintel.config import get_settings
 
     settings = get_settings()
     console.print(settings.model_dump_json(indent=2))
