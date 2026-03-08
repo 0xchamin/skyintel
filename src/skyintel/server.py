@@ -7,17 +7,17 @@ from starlette.responses import JSONResponse, FileResponse
 from starlette.routing import Route
 from starlette.staticfiles import StaticFiles
 
-from osai.config import get_settings
-from osai.flights.opensky import OpenSkyClient
-from osai.flights.adsb_lol import AdsbLolClient
-from osai.flights.merge import merge_flights
-from osai.flights.repository import insert_flights, get_latest_flights, prune_old_flights
-from osai.satellites.celestrak import CelestrakClient
-from osai.satellites.propagator import propagate_batch
-from osai.satellites.repository import upsert_satellites, get_satellites_by_category
-from osai.storage.database import get_db, close_db
+from skyintel.config import get_settings
+from skyintel.flights.opensky import OpenSkyClient
+from skyintel.flights.adsb_lol import AdsbLolClient
+from skyintel.flights.merge import merge_flights
+from skyintel.flights.repository import insert_flights, get_latest_flights, prune_old_flights
+from skyintel.satellites.celestrak import CelestrakClient
+from skyintel.satellites.propagator import propagate_batch
+from skyintel.satellites.repository import upsert_satellites, get_satellites_by_category
+from skyintel.storage.database import get_db, close_db
 
-from osai.weather.openmeteo import OpenMeteoClient
+from skyintel.weather.openmeteo import OpenMeteoClient
 
 
 logger = logging.getLogger(__name__)
@@ -157,7 +157,7 @@ async def api_satellites(request):
 # ── Lifecycle ────────────────────────────────────────────────
 async def on_startup():
     logger.info("OpenSkyAI starting on %s:%d", settings.host, settings.port)
-    from osai.storage.migrations import run_migrations
+    from skyintel.storage.migrations import run_migrations
     db = await get_db(settings.db_path)
     await run_migrations(db)
 

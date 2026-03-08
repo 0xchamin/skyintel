@@ -1,8 +1,8 @@
 """Merge flights from ADSB.lol (primary) + OpenSky (supplementary)."""
 
 import logging
-from osai.models import NormalizedFlight
-from osai.flights.classifier import classify
+from skyintel.models import NormalizedFlight
+from skyintel.flights.classifier import classify
 
 logger = logging.getLogger(__name__)
 

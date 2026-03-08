@@ -1,6 +1,6 @@
 import httpx
 import logging
-from osai.models import NormalizedFlight
+from skyintel.models import NormalizedFlight
 
 logger = logging.getLogger(__name__)
 

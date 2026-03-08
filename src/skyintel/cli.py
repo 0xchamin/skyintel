@@ -57,7 +57,9 @@ def serve(
     bind_port = port or settings.port
 
     console.print(f"[bold green]🔭 OpenSkyAI[/] starting at [bold]http://{bind_host}:{bind_port}[/]")
-    uvicorn.run("osai.server:app", host=bind_host, port=bind_port, log_level="info")
+    #uvicorn.run("osai.server:app", host=bind_host, port=bind_port, log_level="info")
+    uvicorn.run("skyintel.server:app", host=bind_host, port=bind_port, log_level="info")
+
 
 
 @app.command()
