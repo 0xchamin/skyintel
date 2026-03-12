@@ -88,6 +88,35 @@ class AdsbLolClient:
 
         logger.info("ADSB.lol military: %d flights", len(flights))
         return flights
+    
+    async def get_nearby(self, lat: float, lon: float, radius_m: int = 99999) -> list[NormalizedFlight]:
+        """Fetch flights within radius of a point (max 99999m)."""
+        radius_m = min(radius_m, 99999)
+        url = f"https://api.adsb.lol/v2/point/{lat}/{lon}/{radius_m}"
+        resp = await self._http.get(url)
+        resp.raise_for_status()
+        flights = [f for ac in resp.json().get("ac", []) if (f := _normalize(ac))]
+        logger.info("ADSB.lol nearby (%.2f,%.2f r=%dm): %d flights", lat, lon, radius_m, len(flights))
+        return flights
+
+    async def get_by_callsign(self, callsign: str) -> list[NormalizedFlight]:
+        """Fetch flights matching a callsign."""
+        url = f"https://api.adsb.lol/v2/callsign/{callsign.strip().upper()}"
+        resp = await self._http.get(url)
+        resp.raise_for_status()
+        flights = [f for ac in resp.json().get("ac", []) if (f := _normalize(ac))]
+        logger.info("ADSB.lol callsign %s: %d flights", callsign, len(flights))
+        return flights
+
+    async def get_by_hex(self, icao24: str) -> list[NormalizedFlight]:
+        """Fetch flight by ICAO24 hex code."""
+        url = f"https://api.adsb.lol/v2/hex/{icao24.strip().upper()}"
+        resp = await self._http.get(url)
+        resp.raise_for_status()
+        flights = [f for ac in resp.json().get("ac", []) if (f := _normalize(ac))]
+        logger.info("ADSB.lol hex %s: %d flights", icao24, len(flights))
+        return flights
+
 
     async def close(self):
         await self._http.aclose()

@@ -22,8 +22,6 @@ import contextlib
 from starlette.routing import Mount
 
 from skyintel.mcp_tools import mcp
-from skyintel.llm.gateway import chat as llm_chat
-
 
 
 
@@ -127,8 +125,6 @@ async def api_status(request):
         "last_poll_military": _last_poll_military,
         "satellites_cached": _satellite_count,
         "port": settings.port,
-        "cesium_ion_token": settings.cesium_ion_token,
-
     })
 
 async def api_weather(request):
@@ -142,27 +138,6 @@ async def api_weather(request):
         return JSONResponse({"error": "weather fetch failed"}, status_code=502)
     return JSONResponse(data)
 
-async def api_chat(request):
-    """Chat endpoint — proxies to LLM with tool calling."""
-    try:
-        body = await request.json()
-    except Exception:
-        return JSONResponse({"error": "Invalid JSON"}, status_code=400)
-
-    messages = body.get("messages")
-    provider = body.get("provider")
-    api_key = body.get("api_key")
-    model = body.get("model")
-
-    if not messages or not provider or not api_key or not model:
-        return JSONResponse({"error": "messages, provider, api_key, and model are required"}, status_code=400)
-
-    try:
-        reply = await llm_chat(messages, provider, api_key, model)
-        return JSONResponse({"reply": reply})
-    except Exception as e:
-        logger.error("Chat failed: %s", e)
-        return JSONResponse({"error": str(e)}, status_code=500)
 
 async def api_flights(request):
     db = await get_db(settings.db_path)
@@ -227,8 +202,22 @@ async def on_shutdown():
     await close_db()
     logger.info("OpenSkyAI stopped")
 
-mcp_app = mcp.http_app(path="/")
+
 # ── App ──────────────────────────────────────────────────────
+# app = Starlette(
+#     routes=[
+#         Route("/", index),
+#         Route("/api/status", api_status),
+#         Route("/api/flights", api_flights),
+#         Route("/api/satellites", api_satellites),
+#         Route("/api/weather", api_weather),
+#         Route("/api/aircraft/{icao24}", api_aircraft),
+#         Route("/api/route/{callsign}", api_route),
+
+#     ],
+#     on_startup=[on_startup],
+#     on_shutdown=[on_shutdown],
+# )
 @contextlib.asynccontextmanager
 async def lifespan(app):
     await on_startup()
@@ -246,7 +235,6 @@ app = Starlette(
         Route("/api/satellites", api_satellites),
         Route("/api/weather", api_weather),
         Mount("/mcp", app=mcp_app),
-        Route("/api/chat", api_chat, methods=["POST"]),
     ],
     lifespan=lifespan,
 )
@@ -257,5 +245,5 @@ app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
 #app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
 #app.mount("/mcp", mcp.streamable_http_app())
 
-
+mcp_app = mcp.http_app(path="/mcp")
 

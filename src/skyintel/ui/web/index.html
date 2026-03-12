@@ -28,6 +28,7 @@
             padding: 0 16px;
             z-index: 200;
             gap: 8px;
+            overflow-x: auto;
         }
         #toolbar .brand {
             font-size: 15px;
@@ -277,13 +278,35 @@
         <span class="chip" data-type="sat" data-value="starlink" style="color:#6495ED">
             <span class="dot" style="background:#6495ED"></span> Starlink
         </span>
+
+        <div class="divider"></div>
+        <button id="shareBtn" class="chip active" style="color:#0ff; cursor:pointer; border-color:#0ff" onclick="shareSnapshot()">
+            📤 Share
+        </button>
+
+        <div class="divider"></div>
+        <span class="section-label">Layers</span>
+        <select id="layerPicker" style="background:rgba(255,255,255,0.1); color:#fff; border:1px solid rgba(255,255,255,0.2); border-radius:8px; padding:4px 8px; font-size:12px; cursor:pointer;">
+            <option value="dark">🌑 Dark</option>
+            <option value="satellite">🛰 Satellite</option>
+            <option value="streets">🗺 Streets</option>
+            <option value="terrain">⛰ Terrain</option>
+        </select>
+
+        <button id="settingsBtn" class="chip active" style="color:#0ff; cursor:pointer; border-color:#0ff" onclick="openSettings()">
+            ⚙ Settings
+        </button>
+
+        <div class="divider"></div>
+        <button id="chatBtn" class="chip active" style="color:#0ff; cursor:pointer; border-color:#0ff">
+            💬 Chat
+        </button>
     </div>
 
     <!-- Detail panel -->
     <div id="detailPanel">
         <button id="detailClose">✕</button>
         <button id="backBtn" class="back-btn" style="display:none" onclick="flyBack()">⬅ Return to overview</button>
-
         <div id="detailContent"></div>
     </div>
 
@@ -302,6 +325,11 @@
     <script src="/static/flights.js"></script>
     <script src="/static/satellites.js"></script>
     <script src="/static/detail.js"></script>
+    <script src="/static/share.js"></script>
+    <script src="/static/layers.js"></script>
+    <script src="/static/settings.js"></script>
+    <script src="/static/chat.js"></script>
+
     <script>
         const viewer = new Cesium.Viewer("cesiumContainer", {
             imageryProvider: false,
@@ -339,12 +367,14 @@
             },
         });
 
-        // Toggle chips
+        // Toggle chips (only for flight/sat types)
         document.querySelectorAll(".chip").forEach(chip => {
             chip.addEventListener("click", () => {
+                const type = chip.dataset.type;
+                if (!type) return;
+
                 chip.classList.toggle("active");
                 const isActive = chip.classList.contains("active");
-                const type = chip.dataset.type;
                 const value = chip.dataset.value;
 
                 if (type === "flight") {
@@ -355,8 +385,12 @@
             });
         });
 
-        // Init detail panel
+        // Init panels
         initDetailPanel(viewer);
+        initChatPanel();
+
+        // Chat button
+        document.getElementById("chatBtn").addEventListener("click", toggleChat);
 
         // Start tracking
         Promise.all([

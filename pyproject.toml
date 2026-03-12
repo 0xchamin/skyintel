@@ -38,6 +38,7 @@ dependencies = [
     "uvicorn",
     "starlette",
     "geopy",
+    "litellm>=1.80.0",
 ]
 
 [project.optional-dependencies]

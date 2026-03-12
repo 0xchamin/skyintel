@@ -47,3 +47,6 @@ htmlcov/
 # Distribution
 *.tar.gz
 *.whl
+
+# Local tests
+*.txt 

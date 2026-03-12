@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     llm_api_key: str | None = None
     llm_model: str | None = None
 
+    # Cesium
+    cesium_ion_token: str | None = None
+
+
     @property
     def opensky_configured(self) -> bool:
         return self.opensky_client_id is not None and self.opensky_client_secret is not None

@@ -26,11 +26,11 @@ class OpenMeteoClient:
                     "wind_direction_10m",
                     "wind_gusts_10m",
                     "cloud_cover",
-                    "visibility",
+                    #"visibility",
                     "precipitation",
                     "weather_code",
                 ]),
-                "wind_speed_unit": "kt",
+                "wind_speed_unit": "kn",
                 "temperature_unit": "celsius",
             })
             resp.raise_for_status()
@@ -45,7 +45,7 @@ class OpenMeteoClient:
                 "wind_direction": current.get("wind_direction_10m"),
                 "wind_gusts_kt": current.get("wind_gusts_10m"),
                 "cloud_cover_pct": current.get("cloud_cover"),
-                "visibility_m": current.get("visibility"),
+                #"visibility_m": current.get("visibility"),
                 "precipitation_mm": current.get("precipitation"),
                 "weather_code": current.get("weather_code"),
                 "description": _weather_description(current.get("weather_code")),

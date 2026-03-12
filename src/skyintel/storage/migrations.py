@@ -1,7 +1,7 @@
 import aiosqlite
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 MIGRATIONS = {
     1: [
@@ -77,6 +77,30 @@ MIGRATIONS = {
         """,
         "INSERT INTO schema_version (version) VALUES (1)",
     ],
+    2: [
+        """
+        CREATE TABLE IF NOT EXISTS aircraft_meta (
+            icao24          TEXT PRIMARY KEY,
+            registration    TEXT,
+            manufacturer    TEXT,
+            type_code       TEXT,
+            type_name       TEXT,
+            owner           TEXT,
+            operator_code   TEXT,
+            updated_at      TEXT NOT NULL
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS routes (
+            callsign        TEXT PRIMARY KEY,
+            origin_icao     TEXT,
+            destination_icao TEXT,
+            updated_at      TEXT NOT NULL
+        )
+        """,
+        "UPDATE schema_version SET version = 2",
+    ],
+
 }
 
 

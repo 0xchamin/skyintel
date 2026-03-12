@@ -87,6 +87,8 @@ function showFlightDetail(f, el) {
             ${row("Destination", f.destination)}
             ${row("Source", f.source)}
         </div>
+        <div id="aircraftMetaSection"></div>
+        <div id="routeSection"></div>
         <div id="weatherSection"></div>
     `;
 
@@ -94,6 +96,9 @@ function showFlightDetail(f, el) {
     if (canFlyTo) {
         fetchWeather(f.latitude, f.longitude);
     }
+    fetchAircraftMeta(f.icao24);
+    if (f.callsign) fetchRoute(f.callsign);
+
 }
 
 function showSatelliteDetail(s, el) {
@@ -198,7 +203,7 @@ async function fetchWeather(lat, lon) {
                 ${row("Wind", w.wind_speed_kt != null ? `${Math.round(w.wind_speed_kt)} kt ${windDir || ""}` : null)}
                 ${row("Gusts", w.wind_gusts_kt, "kt")}
                 ${row("Cloud cover", w.cloud_cover_pct, "%")}
-                ${row("Visibility", w.visibility_m != null ? (w.visibility_m / 1000).toFixed(1) : null, "km")}
+                
                 ${row("Precipitation", w.precipitation_mm, "mm")}
             </div>
         `;
@@ -206,6 +211,54 @@ async function fetchWeather(lat, lon) {
         section.innerHTML = `<div class="detail-section" style="opacity:0.4">Weather unavailable</div>`;
     }
 }
+
+async function fetchAircraftMeta(icao24) {
+    const section = document.getElementById("aircraftMetaSection");
+    if (!section) return;
+    section.innerHTML = `<div class="detail-section" style="opacity:0.5">Loading aircraft info…</div>`;
+    try {
+        const resp = await fetch(`/api/aircraft/${icao24}`);
+        if (!resp.ok) throw new Error("Not found");
+        const a = await resp.json();
+        section.innerHTML = `
+            <div class="detail-section">
+                <div class="detail-row" style="margin-bottom:6px">
+                    <span class="detail-label" style="font-size:14px;color:#0ff">🛩 Aircraft Info</span>
+                </div>
+                ${row("Manufacturer", a.manufacturer)}
+                ${row("Type", a.type_name)}
+                ${row("Type Code", a.type_code)}
+                ${row("Owner", a.owner)}
+                ${row("Registration", a.registration)}
+            </div>
+        `;
+    } catch (e) {
+        section.innerHTML = "";
+    }
+}
+
+async function fetchRoute(callsign) {
+    const section = document.getElementById("routeSection");
+    if (!section) return;
+    section.innerHTML = `<div class="detail-section" style="opacity:0.5">Loading route…</div>`;
+    try {
+        const resp = await fetch(`/api/route/${callsign}`);
+        if (!resp.ok) throw new Error("Not found");
+        const r = await resp.json();
+        section.innerHTML = `
+            <div class="detail-section">
+                <div class="detail-row" style="margin-bottom:6px">
+                    <span class="detail-label" style="font-size:14px;color:#0ff">🗺 Route</span>
+                </div>
+                ${row("Origin", r.origin_icao)}
+                ${row("Destination", r.destination_icao)}
+            </div>
+        `;
+    } catch (e) {
+        section.innerHTML = "";
+    }
+}
+
 
 function degreesToCompass(deg) {
     const dirs = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
