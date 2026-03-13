@@ -24,13 +24,16 @@ def propagate_one(name: str, tle_line1: str, tle_line2: str, norad_id: int,
         vel = geocentric.velocity.km_per_s
         speed_ms = math.sqrt(vel[0]**2 + vel[1]**2 + vel[2]**2) * 1000
 
+        if not all(math.isfinite(v) for v in (subpoint.latitude.degrees, subpoint.longitude.degrees, subpoint.elevation.km, speed_ms)):
+            return None
+
         return {
             "norad_id": norad_id,
             "name": name,
             "category": category,
-            "latitude": subpoint.latitude.degrees,
-            "longitude": subpoint.longitude.degrees,
-            "altitude_km": subpoint.elevation.km,
+            "latitude": float(subpoint.latitude.degrees),
+            "longitude": float(subpoint.longitude.degrees),
+            "altitude_km": float(subpoint.elevation.km),
             "speed_ms": round(speed_ms, 1),
             "inclination": round(float(tle_line2[8:16].strip()), 2),
         }

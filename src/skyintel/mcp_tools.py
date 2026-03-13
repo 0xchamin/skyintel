@@ -46,7 +46,9 @@ When asked to generate a report (HTML, summary, briefing, etc.):
 
 
 @mcp.tool()
-async def flights_near(lat: float, lon: float, radius_km: float = 100) -> list[dict]:
+async def flights_near(lat: float, lon: float, radius_km: float = 100, max_results: int = 50) -> dict:
+
+
     """Get live flights near a geographic point via ADSB.lol real-time feed.
 
     Returns a list of flights, each containing: icao24, callsign, aircraft_type
@@ -57,12 +59,16 @@ async def flights_near(lat: float, lon: float, radius_km: float = 100) -> list[d
         lat: Latitude of center point (-90 to 90)
         lon: Longitude of center point (-180 to 180)
         radius_km: Search radius in kilometers (max ~100km due to API limits)
+        max_results: Maximum number of results to return (default 50). Use a higher value if user asks for above 50 (e.g. all, 100, etc.).
+
     """
-    return await service.flights_near(lat, lon, radius_km)
+    #return await service.flights_near(lat, lon, radius_km, max_results)
+    return await service.flights_near(lat, lon, radius_km, max_results)
 
 
 @mcp.tool()
-async def search_flight(query: str) -> list[dict]:
+async def search_flight(query: str, max_results: int = 50) -> dict:
+
     """Search for a specific flight by callsign or ICAO24 hex code.
 
     Automatically detects the query type: 6-character hex strings are treated as
@@ -74,11 +80,12 @@ async def search_flight(query: str) -> list[dict]:
     Args:
         query: Callsign (e.g. 'RYR123') or ICAO24 hex code (e.g. '4CA87A')
     """
-    return await service.search_flight(query)
+    return await service.search_flight(query, max_results)
 
 
 @mcp.tool()
-async def military_flights() -> list[dict]:
+async def military_flights(max_results: int = 50) -> dict:
+
     """Get all currently airborne military aircraft worldwide.
 
     Sources data from ADSB.lol's dedicated military feed, which is unfiltered —
@@ -87,12 +94,15 @@ async def military_flights() -> list[dict]:
 
     Returns the standard flight data structure with aircraft_type set to 'military'.
     Typically returns 50-300+ aircraft depending on time of day and global activity.
-    """
-    return await service.military_flights()
 
+    Args:
+        max_results: Maximum number of results to return (default 50). Use a higher value if user asks for above 50 (e.g. all, 100, etc.).
+    """
+    return await service.military_flights(max_results)
 
 @mcp.tool()
-async def flights_to(destination_icao: str) -> list[dict]:
+async def flights_to(destination_icao: str, max_results: int = 50) -> dict:
+
     """Find current flights heading to a destination airport.
 
     Uses cached route data from hexdb.io, cross-referenced with live flight positions.
@@ -103,11 +113,12 @@ async def flights_to(destination_icao: str) -> list[dict]:
         destination_icao: ICAO airport code, e.g. 'EHAM' (Amsterdam Schiphol),
             'EGLL' (London Heathrow), 'KJFK' (New York JFK), 'VGHS' (Dhaka Shahjalal)
     """
-    return await service.flights_to(destination_icao)
+    return await service.flights_to(destination_icao, max_results)
 
 
 @mcp.tool()
-async def flights_from(origin_icao: str) -> list[dict]:
+async def flights_from(origin_icao: str, max_results: int = 50) -> dict:
+
     """Find current flights that departed from an origin airport.
 
     Uses cached route data from hexdb.io, cross-referenced with live flight positions.
@@ -118,8 +129,7 @@ async def flights_from(origin_icao: str) -> list[dict]:
         origin_icao: ICAO airport code, e.g. 'EHAM' (Amsterdam Schiphol),
             'EGLL' (London Heathrow), 'KJFK' (New York JFK), 'VCBI' (Colombo Bandaranaike)
     """
-    return await service.flights_from(origin_icao)
-
+    return await service.flights_from(origin_icao, max_results)
 
 @mcp.tool()
 async def aircraft_info(icao24: str) -> dict | None:
@@ -138,7 +148,9 @@ async def aircraft_info(icao24: str) -> dict | None:
 
 
 @mcp.tool()
-async def get_satellites(category: str | None = None) -> list[dict]:
+async def get_satellites(category: str | None = None, max_results: int = 50) -> dict:
+
+
     """Get current satellite positions propagated from TLE orbital data.
 
     Returns: norad_id, name, category, latitude, longitude, altitude_km,
@@ -153,8 +165,9 @@ async def get_satellites(category: str | None = None) -> list[dict]:
 
     Args:
         category: Filter by satellite category, or None for all
+        max_results: Maximum number of results to return (default 50). Use a higher value if user asks for above 50 (e.g. all, 100, etc.).
     """
-    return await service.get_satellites(category)
+    return await service.get_satellites(category, max_results)
 
 
 @mcp.tool()
@@ -184,3 +197,38 @@ async def get_status() -> dict:
     the system is operational and data is flowing.
     """
     return await service.get_status()
+
+@mcp.tool()
+async def iss_position() -> dict:
+    """Get the current real-time position of the International Space Station.
+
+    Returns: latitude, longitude, altitude_km, speed_ms, and orbital metadata.
+    Position computed via SGP4 propagation from Celestrak TLE data refreshed hourly.
+    """
+    return await service.iss_position()
+
+
+@mcp.tool()
+async def iss_crew() -> dict:
+    """Get the current crew aboard the International Space Station.
+
+    Returns: list of crew members with names, and total count.
+    Data sourced from Open Notify API.
+    """
+    return await service.iss_crew()
+
+
+@mcp.tool()
+async def iss_passes(lat: float, lon: float, hours: int = 24, min_elevation: float = 10.0) -> dict:
+    """Predict upcoming ISS passes visible from a ground location.
+
+    Returns rise/culmination/set times, azimuths, max elevation, and duration
+    for each pass. Only passes with peak elevation above min_elevation are included.
+
+    Args:
+        lat: Observer latitude (-90 to 90)
+        lon: Observer longitude (-180 to 180)
+        hours: Lookahead window in hours (default 24)
+        min_elevation: Minimum peak elevation in degrees to include (default 10)
+    """
+    return await service.iss_passes(lat, lon, hours, min_elevation)

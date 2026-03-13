@@ -35,6 +35,14 @@ class Settings(BaseSettings):
     # Cesium
     cesium_ion_token: str | None = None
 
+    # LangFuse
+    langfuse_public_key: str | None = None
+    langfuse_secret_key: str | None = None
+    #langfuse_host: str = "https://cloud.langfuse.com"
+    langfuse_otel_host: str = "https://cloud.langfuse.com"
+
+
+
 
     @property
     def opensky_configured(self) -> bool:

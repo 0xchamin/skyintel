@@ -2,9 +2,10 @@
 
 import json
 import logging
-#from litellm import acompletion
+import asyncio as _asyncio
 
 from skyintel import service
+from skyintel.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +15,8 @@ PROVIDER_PREFIX = {
     "openai": "",
     "google": "gemini/",
 }
+
+MAX_RESULT_ITEMS = 500
 
 TOOLS = [
     {
@@ -27,6 +30,7 @@ TOOLS = [
                     "lat": {"type": "number", "description": "Latitude (-90 to 90)"},
                     "lon": {"type": "number", "description": "Longitude (-180 to 180)"},
                     "radius_km": {"type": "number", "description": "Radius in km (max ~100)", "default": 100},
+                    "max_results": {"type": "integer", "description": "Max results to return (default 50)", "default": 50},
                 },
                 "required": ["lat", "lon"],
             },
@@ -41,6 +45,7 @@ TOOLS = [
                 "type": "object",
                 "properties": {
                     "query": {"type": "string", "description": "Callsign or ICAO24 hex"},
+                    "max_results": {"type": "integer", "description": "Max results to return (default 50)", "default": 50},
                 },
                 "required": ["query"],
             },
@@ -51,7 +56,12 @@ TOOLS = [
         "function": {
             "name": "military_flights",
             "description": "Get all currently airborne military aircraft worldwide. Unfiltered — unlike commercial trackers.",
-            "parameters": {"type": "object", "properties": {}},
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "max_results": {"type": "integer", "description": "Max results to return (default 50)", "default": 50},
+                },
+            },
         },
     },
     {
@@ -63,6 +73,7 @@ TOOLS = [
                 "type": "object",
                 "properties": {
                     "destination_icao": {"type": "string", "description": "ICAO airport code"},
+                    "max_results": {"type": "integer", "description": "Max results to return (default 50)", "default": 50},
                 },
                 "required": ["destination_icao"],
             },
@@ -77,6 +88,7 @@ TOOLS = [
                 "type": "object",
                 "properties": {
                     "origin_icao": {"type": "string", "description": "ICAO airport code"},
+                    "max_results": {"type": "integer", "description": "Max results to return (default 50)", "default": 50},
                 },
                 "required": ["origin_icao"],
             },
@@ -105,6 +117,7 @@ TOOLS = [
                 "type": "object",
                 "properties": {
                     "category": {"type": "string", "description": "Category filter or null for all"},
+                    "max_results": {"type": "integer", "description": "Max results to return (default 50)", "default": 50},
                 },
             },
         },
@@ -132,6 +145,40 @@ TOOLS = [
             "parameters": {"type": "object", "properties": {}},
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "iss_position",
+            "description": "Get the current real-time position of the International Space Station — latitude, longitude, altitude, speed.",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "iss_crew",
+            "description": "Get the current crew aboard the International Space Station — names and count.",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "iss_passes",
+            "description": "Predict upcoming ISS passes visible from a ground location. Returns rise/set times, max elevation, duration.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "lat": {"type": "number", "description": "Observer latitude (-90 to 90)"},
+                    "lon": {"type": "number", "description": "Observer longitude (-180 to 180)"},
+                    "hours": {"type": "integer", "description": "Lookahead window in hours (default 24)", "default": 24},
+                    "min_elevation": {"type": "number", "description": "Minimum peak elevation in degrees (default 10)", "default": 10.0},
+                },
+                "required": ["lat", "lon"],
+            },
+        },
+    },
+
 ]
 
 # Map tool names to service functions
@@ -145,7 +192,27 @@ TOOL_HANDLERS = {
     "get_satellites": service.get_satellites,
     "get_weather": service.get_weather,
     "get_status": service.get_status,
+    "iss_position": service.iss_position,
+    "iss_crew": service.iss_crew,
+    "iss_passes": service.iss_passes,
+
 }
+
+def _configure_langfuse():
+    """Configure LangFuse OTEL callbacks for LiteLLM if keys are set."""
+    settings = get_settings()
+    if settings.langfuse_public_key and settings.langfuse_secret_key:
+        import litellm
+        import os
+        os.environ["LANGFUSE_PUBLIC_KEY"] = settings.langfuse_public_key
+        os.environ["LANGFUSE_SECRET_KEY"] = settings.langfuse_secret_key
+        os.environ["LANGFUSE_OTEL_HOST"] = settings.langfuse_otel_host
+        litellm.callbacks = ["langfuse_otel"]
+        logger.info("LangFuse OTEL observability enabled")
+
+_configure_langfuse()
+
+
 
 SYSTEM_PROMPT = """You are an expert aviation and space intelligence analyst powered by Open Sky Intelligence.
 
@@ -156,7 +223,33 @@ When generating reports, use well-structured HTML with inline CSS (dark theme).
 Always note timestamps — this is live data. Prioritise military flights in listings.
 Convert place names to coordinates yourself — you know world geography."""
 
+SYSTEM_PROMPT_CLI = SYSTEM_PROMPT.replace(
+    "When generating reports, use well-structured HTML with inline CSS (dark theme).",
+    "When generating reports, use clean markdown formatting — tables, headers, bullet points. No HTML."
+)
+
 MAX_TOOL_ROUNDS = 10
+
+
+def _truncate_result(result):
+    """Safety net — truncate if results still too large."""
+    if isinstance(result, dict) and "results" in result and isinstance(result["results"], list):
+        if len(result["results"]) > MAX_RESULT_ITEMS:
+            result = {
+                **result,
+                "results": result["results"][:MAX_RESULT_ITEMS],
+                "truncated": True,
+                "note": f"Showing top {MAX_RESULT_ITEMS} of {result.get('total_count', '?')} results."
+            }
+        return json.dumps(result, default=str)
+    if isinstance(result, list) and len(result) > MAX_RESULT_ITEMS:
+        return json.dumps({
+            "results": result[:MAX_RESULT_ITEMS],
+            "total_count": len(result),
+            "truncated": True,
+            "note": f"Showing top {MAX_RESULT_ITEMS} of {len(result)} results."
+        }, default=str)
+    return json.dumps(result, default=str)
 
 
 async def execute_tool(name: str, args: dict):
@@ -166,7 +259,7 @@ async def execute_tool(name: str, args: dict):
         return json.dumps({"error": f"Unknown tool: {name}"})
     try:
         result = await handler(**args)
-        return json.dumps(result, default=str)
+        return _truncate_result(result)
     except Exception as e:
         logger.error("Tool %s failed: %s", name, e)
         return json.dumps({"error": str(e)})
@@ -177,8 +270,8 @@ async def chat(
     provider: str,
     api_key: str,
     model: str,
+    output_format: str = "html",
 ) -> str:
-    from litellm import acompletion
     """Run a chat completion with tool-calling loop.
 
     Args:
@@ -186,22 +279,37 @@ async def chat(
         provider: 'anthropic', 'openai', or 'google'
         api_key: User's API key (from localStorage, never stored)
         model: Model name (e.g. 'claude-sonnet-4-20250514')
+        output_format: 'html' for web chat, 'markdown' for CLI
 
     Returns:
         Final assistant text response.
     """
+    from litellm import acompletion
+
     prefix = PROVIDER_PREFIX.get(provider, "")
     litellm_model = f"{prefix}{model}"
 
-    full_messages = [{"role": "system", "content": SYSTEM_PROMPT}] + messages
+    prompt = SYSTEM_PROMPT_CLI if output_format == "markdown" else SYSTEM_PROMPT
+    full_messages = [{"role": "system", "content": prompt}] + messages
 
     for _ in range(MAX_TOOL_ROUNDS):
-        response = await acompletion(
-            model=litellm_model,
-            messages=full_messages,
-            tools=TOOLS,
-            api_key=api_key,
-        )
+        for attempt in range(3):
+            try:
+                response = await acompletion(
+                    model=litellm_model,
+                    messages=full_messages,
+                    tools=TOOLS,
+                    api_key=api_key,
+                )
+                break
+            except Exception as e:
+                if "rate_limit" in str(e).lower() and attempt < 2:
+                    wait = (attempt + 1) * 30
+                    logger.warning("Rate limited, retrying in %ds (attempt %d/3)", wait, attempt + 1)
+                    await _asyncio.sleep(wait)
+                else:
+                    raise
+
 
         choice = response.choices[0]
 

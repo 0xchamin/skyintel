@@ -1,1 +1,1 @@
-"""OpenSkyAI — real-time flight, military aircraft, and satellite tracking."""
+"""Open Sky Intelligence — real-time flight, military aircraft, and satellite tracking."""

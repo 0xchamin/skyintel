@@ -61,15 +61,21 @@ async def flight_poll_loop():
     while True:
         try:
             db = await get_db(settings.db_path)
-            adsb_all, opensky_all, adsb_mil = await asyncio.gather(
-                adsb.get_all(),
+            # adsb_all, opensky_all, adsb_mil = await asyncio.gather(
+            #     adsb.get_all(),
+            #     opensky.get_states(),
+            #     adsb.get_military(),
+            #     return_exceptions=True,
+            # )
+            opensky_all, adsb_mil = await asyncio.gather(
                 opensky.get_states(),
                 adsb.get_military(),
                 return_exceptions=True,
             )
-            if isinstance(adsb_all, Exception):
-                logger.error("ADSB.lol all failed: %s", adsb_all)
-                adsb_all = []
+
+            # if isinstance(adsb_all, Exception):
+            #     logger.error("ADSB.lol all failed: %s", adsb_all)
+            #     adsb_all = []
             if isinstance(opensky_all, Exception):
                 logger.error("OpenSky failed: %s", opensky_all)
                 opensky_all = []
@@ -77,7 +83,7 @@ async def flight_poll_loop():
                 logger.error("ADSB.lol mil failed: %s", adsb_mil)
                 adsb_mil = []
 
-            merged = merge_flights(adsb_all, opensky_all, adsb_mil)
+            merged = merge_flights([], opensky_all, adsb_mil)
             await insert_flights(db, merged)
 
             _poll_count += 1
@@ -207,10 +213,30 @@ async def api_satellites(request):
     positions = propagate_batch(tles)
     return JSONResponse(positions)
 
+# ── ISS ────────────────────────────────────────────────
+async def api_iss(request):
+    """Get current ISS position + crew."""
+    from skyintel import service
+    position = await service.iss_position()
+    crew = await service.iss_crew()
+    return JSONResponse({"position": position, "crew": crew})
+
+
+async def api_iss_passes(request):
+    """Get ISS pass predictions for a location."""
+    from skyintel import service
+    lat = request.query_params.get("lat")
+    lon = request.query_params.get("lon")
+    if lat is None or lon is None:
+        return JSONResponse({"error": "lat and lon required"}, status_code=400)
+    hours = int(request.query_params.get("hours", 24))
+    result = await service.iss_passes(float(lat), float(lon), hours)
+    return JSONResponse(result)
+
 
 # ── Lifecycle ────────────────────────────────────────────────
 async def on_startup():
-    logger.info("OpenSkyAI starting on %s:%d", settings.host, settings.port)
+    logger.info("Open Sky Intelligence starting on %s:%d", settings.host, settings.port)
     from skyintel.storage.migrations import run_migrations
     db = await get_db(settings.db_path)
     await run_migrations(db)
@@ -225,7 +251,7 @@ async def on_shutdown():
     await celestrak.close()
     await weather.close()
     await close_db()
-    logger.info("OpenSkyAI stopped")
+    logger.info("Open Sky Intelligence stopped")
 
 mcp_app = mcp.http_app(path="/")
 # ── App ──────────────────────────────────────────────────────
@@ -247,6 +273,9 @@ app = Starlette(
         Route("/api/weather", api_weather),
         Mount("/mcp", app=mcp_app),
         Route("/api/chat", api_chat, methods=["POST"]),
+        Route("/api/iss", api_iss),
+        Route("/api/iss/passes", api_iss_passes),
+
     ],
     lifespan=lifespan,
 )

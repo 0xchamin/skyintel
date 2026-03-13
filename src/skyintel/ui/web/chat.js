@@ -25,6 +25,7 @@ function initChatPanel() {
         <div class="chat-header">
             <span class="chat-title">💬 Open Sky Intelligence Chat</span>
             <div style="display:flex; gap:6px;">
+                <button id="chatExpand" title="Expand/collapse" style="background:none; border:none; color:rgba(255,255,255,0.5); font-size:16px; cursor:pointer;">⇔</button>
                 <button id="chatClear" title="Clear history" style="background:none; border:none; color:rgba(255,255,255,0.5); font-size:16px; cursor:pointer;">🗑</button>
                 <button id="chatClose" style="background:rgba(255,255,255,0.1); border:none; color:#fff; font-size:16px; width:28px; height:28px; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center;">✕</button>
             </div>
@@ -80,6 +81,7 @@ function initChatPanel() {
             flex-direction: column;
             gap: 12px;
         }
+        #chatPanel.expanded { width: 700px; }
         .chat-msg {
             max-width: 90%;
             padding: 10px 14px;
@@ -200,6 +202,10 @@ function initChatPanel() {
         showShareToast("Chat history cleared.");
     });
 
+    document.getElementById("chatExpand").addEventListener("click", () => {
+    panel.classList.toggle("expanded");
+    });
+
     const input = document.getElementById("chatInput");
     const sendBtn = document.getElementById("chatSend");
 
@@ -295,7 +301,7 @@ async function sendMessage() {
     const thinking = appendMessage("thinking", "Thinking…", false);
 
     try {
-        const history = getChatHistory();
+        const history = getChatHistory().slice(-6);
         const resp = await fetch("/api/chat", {
             method: "POST",
             headers: { "Content-Type": "application/json" },

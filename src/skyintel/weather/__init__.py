@@ -1,1 +1,1 @@
-"""OpenSkyAI weather data."""
+"""Open Sky Intelligence weather data."""

@@ -19,6 +19,7 @@ function getStoredConfig() {
     } catch { return null; }
 }
 
+
 function saveConfig(provider, apiKey, model) {
     localStorage.setItem("skyintel_llm", JSON.stringify({ provider, apiKey, model }));
 }
@@ -91,6 +92,8 @@ function openSettings() {
         const apiKey = document.getElementById("llmApiKey").value.trim();
         const model = document.getElementById("llmModel").value.trim();
         if (!apiKey) { alert("API key is required"); return; }
+        if (!model) model = DEFAULT_MODELS[provider] || "";
+        document.getElementById("llmModel").value = model;
         saveConfig(provider, apiKey, model);
         modal.style.display = "none";
         showShareToast("LLM settings saved!");

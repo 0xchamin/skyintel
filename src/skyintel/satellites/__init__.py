@@ -1,1 +1,1 @@
-"""OpenSkyAI satellite tracking."""
+"""Open Sky Intelligence satellite tracking."""

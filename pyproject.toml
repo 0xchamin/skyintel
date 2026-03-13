@@ -39,6 +39,7 @@ dependencies = [
     "starlette",
     "geopy",
     "litellm>=1.80.0",
+    "langfuse",
 ]
 
 [project.optional-dependencies]

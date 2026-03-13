@@ -1,1 +1,1 @@
-"""OpenSkyAI flight tracking."""
+"""Open Sky Intelligence flight tracking."""

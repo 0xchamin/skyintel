@@ -1,1 +1,1 @@
-"""OpenSkyAI storage layer."""
+"""Open Sky Intelligence storage layer."""

@@ -23,6 +23,42 @@ let satCounts = {};
 // ── Icon ────────────────────────────────────────────────────
 const satIconCache = {};
 
+function issIcon() {
+    const key = "iss-main";
+    if (satIconCache[key]) return satIconCache[key];
+
+    const s = 40;
+    const c = document.createElement("canvas");
+    c.width = s; c.height = s;
+    const ctx = c.getContext("2d");
+    const h = s / 2;
+
+    // Solar panels (two wide rectangles)
+    ctx.fillStyle = "rgba(255, 214, 0, 0.9)";
+    ctx.fillRect(2, h - 3, 14, 6);   // left panel
+    ctx.fillRect(s - 16, h - 3, 14, 6); // right panel
+
+    // Central module (small bright core)
+    ctx.fillStyle = "#FFD600";
+    ctx.shadowColor = "#FFD600";
+    ctx.shadowBlur = 8;
+    ctx.fillRect(h - 4, h - 4, 8, 8);
+
+    // Truss (connecting line)
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = "rgba(255, 214, 0, 0.7)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(2, h);
+    ctx.lineTo(s - 2, h);
+    ctx.stroke();
+
+    const dataUrl = c.toDataURL();
+    satIconCache[key] = dataUrl;
+    return dataUrl;
+}
+
+
 function satelliteIcon(color) {
     const key = color.toCssColorString();
     if (satIconCache[key]) return satIconCache[key];
@@ -89,26 +125,40 @@ function renderSatellites(viewer, satellites) {
         const position = Cesium.Cartesian3.fromDegrees(sat.longitude, sat.latitude, altMetres);
         const groundPos = Cesium.Cartesian3.fromDegrees(sat.longitude, sat.latitude, 0);
 
+        // satBillboards.add({
+        //     position: position,
+        //     image: satelliteIcon(color),
+        //     scale: 1.0,
+        //     scaleByDistance: new Cesium.NearFarScalar(1e5, 1.2, 5e7, 0.3),
+        //     verticalOrigin: Cesium.VerticalOrigin.CENTER,
+        //     id: sat,
+            
+        // });
+        const isISS = sat.name && sat.name.toUpperCase().includes("ZARYA");
+
         satBillboards.add({
             position: position,
-            image: satelliteIcon(color),
-            scale: 1.0,
-            scaleByDistance: new Cesium.NearFarScalar(1e5, 1.2, 5e7, 0.3),
+            image: isISS ? issIcon() : satelliteIcon(color),
+            scale: isISS ? 1.4 : 1.0,
+            scaleByDistance: new Cesium.NearFarScalar(1e5, isISS ? 1.8 : 1.2, 5e7, isISS ? 0.6 : 0.3),
             verticalOrigin: Cesium.VerticalOrigin.CENTER,
             id: sat,
         });
 
         satLabels.add({
             position: position,
-            text: sat.name,
-            font: "10px sans-serif",
-            fillColor: color,
-            style: Cesium.LabelStyle.FILL,
+            text: isISS ? "ISS" : sat.name,
+            font: isISS ? "bold 13px sans-serif" : "10px sans-serif",
+            fillColor: isISS ? Cesium.Color.YELLOW : color,
+            style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+            outlineColor: Cesium.Color.BLACK,
+            outlineWidth: isISS ? 2 : 0,
             verticalOrigin: Cesium.VerticalOrigin.TOP,
-            pixelOffset: new Cesium.Cartesian2(0, 14),
-            scaleByDistance: new Cesium.NearFarScalar(1e5, 1.0, 1e7, 0.0),
-            distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 5e6),
+            pixelOffset: new Cesium.Cartesian2(0, isISS ? 18 : 14),
+            scaleByDistance: new Cesium.NearFarScalar(1e5, 1.0, isISS ? 5e7 : 1e7, 0.0),
+            distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, isISS ? 5e7 : 5e6),
         });
+
 
         // Tether line
         tetherLines.add({

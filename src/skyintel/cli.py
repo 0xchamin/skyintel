@@ -4,7 +4,7 @@ from rich.table import Table
 
 app = typer.Typer(
     name="skyintel",
-    help="OpenSkyAI — real-time flight, military aircraft, and satellite tracking.",
+    help="Open Sky Intelligence — real-time flight, military aircraft, and satellite tracking.",
     no_args_is_help=True,
 )
 console = Console()
@@ -122,6 +122,7 @@ def flights(
             hdg = str(round(f["heading"])) + "°" if f.get("heading") else ""
             table.add_row(f["icao24"], f.get("callsign") or "", f.get("aircraft_type", ""), alt, spd, hdg)
         console.print(table)
+        await service.cleanup()
 
     asyncio.run(_run())
 
@@ -146,6 +147,7 @@ def satellites(
                 f'{s["latitude"]:.2f}', f'{s["longitude"]:.2f}',
             )
         console.print(table)
+        await service.cleanup()
 
     asyncio.run(_run())
 
@@ -202,25 +204,9 @@ def above(
         for s in nearby_sats:
             st.add_row(str(s["norad_id"]), s["name"], s["category"], str(round(s.get("altitude_km", 0))))
         console.print(st)
+        await service.cleanup()
 
     asyncio.run(_run())
-
-
-# @app.command(name="mcp-config")
-# def mcp_config(
-#     stdio: bool = typer.Option(False, "--stdio", help="Print stdio config instead of HTTP"),
-# ):
-#     """Print MCP configuration snippet for Claude Desktop / Cursor."""
-#     import json
-#     from skyintel.config import get_settings
-#     if stdio:
-#         config = {"mcpServers": {"skyintel": {"command": "skyintel", "args": ["serve", "--stdio"]}}}
-#     else:
-#         settings = get_settings()
-#         config = {"mcpServers": {"skyintel": {"url": f"http://localhost:{settings.port}/mcp"}}}
-#     console.print("\n[bold cyan]Add this to your mcp.json:[/]\n")
-#     console.print(json.dumps(config, indent=2))
-#     console.print()
 
 @app.command(name="mcp-config")
 def mcp_config(
@@ -244,4 +230,84 @@ def mcp_config(
     console.print(f"\n[bold cyan]Add this to your mcp.json ({target}):[/]\n")
     console.print(json.dumps(config, indent=2))
     console.print()
+
+@app.command()
+def ask(
+    question: str = typer.Argument(..., help="Question to ask the AI"),
+    provider: str = typer.Option(None, help="LLM provider (anthropic/openai/google)"),
+    api_key: str = typer.Option(None, "--api-key", help="API key"),
+    model: str = typer.Option(None, help="Model name"),
+):
+    """Ask the AI a question using your LLM API key."""
+    import asyncio
+    from skyintel.config import get_settings
+    from skyintel.llm.gateway import chat as llm_chat
+
+    settings = get_settings()
+    p = provider or settings.llm_provider
+    k = api_key or settings.llm_api_key
+    m = model or settings.llm_model
+
+    if not all([p, k, m]):
+        console.print("[red]LLM not configured.[/] Set SKYINTEL_LLM_PROVIDER, SKYINTEL_LLM_API_KEY, SKYINTEL_LLM_MODEL in .env or pass --provider, --api-key, --model")
+        raise typer.Exit(1)
+
+    async def _run():
+        with console.status("[cyan]Thinking…[/]"):
+            reply = await llm_chat([{"role": "user", "content": question}], p, k, m, output_format="markdown")
+        reply = reply.strip()
+        console.print()
+        from rich.markdown import Markdown
+        console.print(Markdown(reply))
+        
+
+    asyncio.run(_run())
+
+@app.command()
+def iss(
+    passes_flag: bool = typer.Option(False, "--passes", help="Show upcoming pass predictions"),
+    lat: float = typer.Option(None, help="Observer latitude (for --passes)"),
+    lon: float = typer.Option(None, help="Observer longitude (for --passes)"),
+    hours: int = typer.Option(24, help="Lookahead hours (for --passes)"),
+):
+    """Show ISS position, crew, and pass predictions."""
+    import asyncio
+    from skyintel import service
+
+    async def _run():
+        if passes_flag:
+            if lat is None or lon is None:
+                console.print("[red]--lat and --lon required for pass predictions[/]")
+                return
+            result = await service.iss_passes(lat, lon, hours)
+            table = Table(title=f"ISS Passes ({result['total_count']})", border_style="dim")
+            for col in ["Rise (UTC)", "Direction", "Max Elev", "Set (UTC)", "Duration"]:
+                table.add_column(col)
+            for p in result["passes"]:
+                table.add_row(
+                    p.get("rise_utc", "")[:19],
+                    p.get("rise_direction", ""),
+                    f'{p.get("max_elevation", 0)}°',
+                    p.get("set_utc", "")[:19],
+                    f'{p.get("duration_seconds", 0)}s',
+                )
+            console.print(table)
+        else:
+            pos, crew = await asyncio.gather(service.iss_position(), service.iss_crew())
+            table = Table(title="🛰 ISS Status", show_header=False, border_style="dim")
+            table.add_column("Key", style="bold cyan")
+            table.add_column("Value")
+            table.add_row("Latitude", f'{pos.get("latitude", 0):.4f}')
+            table.add_row("Longitude", f'{pos.get("longitude", 0):.4f}')
+            table.add_row("Altitude", f'{pos.get("altitude_km", 0):.0f} km')
+            table.add_row("Speed", f'{pos.get("speed_ms", 0):.0f} m/s')
+            table.add_row("Crew", str(crew.get("count", 0)))
+            for c in crew.get("crew", []):
+                table.add_row("", f' . {c["name"]}')
+            console.print(table)
+        await service.cleanup()    
+
+    asyncio.run(_run())
+
+
 

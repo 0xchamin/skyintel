@@ -102,6 +102,9 @@ function showFlightDetail(f, el) {
 }
 
 function showSatelliteDetail(s, el) {
+    if (s.name && s.name.toUpperCase().includes("ZARYA")) {
+        return showISSDetail(s, el);
+    }
     const catColors = {
         iss: "#FFD600", military: "#ef5350", weather: "#00BFFF",
         nav: "#00E676", science: "#FF9800", starlink: "#6495ED",
@@ -128,6 +131,49 @@ function showSatelliteDetail(s, el) {
         </div>
     `;
 }
+
+async function trackISS() {
+    try {
+        const resp = await fetch("/api/iss");
+        if (!resp.ok) throw new Error("Failed to fetch ISS position");
+        const data = await resp.json();
+        const pos = data.position;
+        if (pos.latitude == null || pos.longitude == null) return;
+
+        // Save current camera
+        _previousCamera = {
+            position: _viewer.camera.position.clone(),
+            heading: _viewer.camera.heading,
+            pitch: _viewer.camera.pitch,
+            roll: _viewer.camera.roll,
+        };
+
+        // Rotate globe to ISS location at high altitude (global view)
+        _viewer.camera.flyTo({
+            destination: Cesium.Cartesian3.fromDegrees(pos.longitude, pos.latitude, 8000000),
+            orientation: {
+                heading: Cesium.Math.toRadians(0),
+                pitch: Cesium.Math.toRadians(-90),
+                roll: 0,
+            },
+            duration: 2.0,
+            complete: () => {
+                const backBtn = document.getElementById("backBtn");
+                if (backBtn) backBtn.style.display = "block";
+            },
+        });
+
+        // Open detail panel with ISS info
+        const content = document.getElementById("detailContent");
+        const panel = document.getElementById("detailPanel");
+        showISSDetail(pos, content);
+        panel.classList.add("open");
+    } catch (e) {
+        console.error("Track ISS failed:", e);
+    }
+}
+
+
 
 // ── Fly-to ──────────────────────────────────────────────────
 function flyToTarget(lat, lon, altMetres) {
@@ -264,4 +310,58 @@ function degreesToCompass(deg) {
     const dirs = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
                   "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
     return dirs[Math.round(deg / 22.5) % 16];
+}
+
+
+async function showISSDetail(s, el) {
+    const badge = `<span class="detail-badge" style="background:#FFD600;color:#000">ISS</span>`;
+    const canFlyTo = s.latitude != null && s.longitude != null;
+
+    el.innerHTML = `
+        <div class="detail-header">
+            <div class="detail-title">🛰 International Space Station</div>
+            ${badge}
+        </div>
+        ${canFlyTo ? `<button class="flyto-btn" onclick="flyToTarget(${s.latitude}, ${s.longitude}, ${(s.altitude_km || 400) * 1000})">📍 Fly to ISS</button>` : ""}
+        <div class="detail-section">
+            ${row("Altitude", s.altitude_km != null ? Math.round(s.altitude_km).toLocaleString() : null, "km")}
+            ${row("Speed", s.speed_ms != null ? Math.round(s.speed_ms).toLocaleString() : null, "m/s")}
+            ${row("Latitude", s.latitude != null ? s.latitude.toFixed(4) : null)}
+            ${row("Longitude", s.longitude != null ? s.longitude.toFixed(4) : null)}
+        </div>
+        <div id="issCrewSection"><div class="detail-section" style="opacity:0.5">Loading crew…</div></div>
+        <div id="issPassesSection"></div>
+        <div class="detail-section">
+            <div class="detail-row" style="margin-bottom:6px">
+                <span class="detail-label" style="font-size:14px;color:#0ff">📺 Live Feeds</span>
+            </div>
+            <a href="https://www.nasa.gov/nasalive" target="_blank" style="color:#0ff; font-size:13px; text-decoration:none;">🔴 NASA Live Stream →</a><br>
+            <a href="https://eol.jsc.nasa.gov/ESRS/HDEV/" target="_blank" style="color:#0ff; font-size:13px; text-decoration:none; margin-top:4px; display:inline-block;">🌍 Earth HD Camera →</a>
+        </div>
+    `;
+
+    // Fetch crew
+    try {
+        const resp = await fetch("/api/iss");
+        if (resp.ok) {
+            const data = await resp.json();
+            const crew = data.crew?.crew || [];
+            const section = document.getElementById("issCrewSection");
+            if (section && crew.length > 0) {
+                section.innerHTML = `
+                    <div class="detail-section">
+                        <div class="detail-row" style="margin-bottom:6px">
+                            <span class="detail-label" style="font-size:14px;color:#0ff">👥 Crew (${crew.length})</span>
+                        </div>
+                        ${crew.map(c => `<div class="detail-row"><span class="detail-value">• ${c.name}</span></div>`).join("")}
+                    </div>
+                `;
+            }
+        }
+    } catch (e) {}
+
+    // Fetch next passes (use ISS position as observer for demo, ideally user location)
+    if (canFlyTo) {
+        fetchWeather(s.latitude, s.longitude);
+    }
 }

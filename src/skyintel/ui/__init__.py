@@ -1,1 +1,1 @@
-"""OpenSkyAI web UI."""
+"""Open Sky Intelligence web UI."""

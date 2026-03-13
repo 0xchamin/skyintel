@@ -261,7 +261,7 @@
 
         <span class="section-label">Satellites</span>
         <span class="chip active" data-type="sat" data-value="iss" style="color:#FFD600">
-            <span class="dot" style="background:#FFD600"></span> ISS
+            <span class="dot" style="background:#FFD600"></span> Space Stations
         </span>
         <span class="chip active" data-type="sat" data-value="military" style="color:#ef5350">
             <span class="dot" style="background:#ef5350"></span> Military
@@ -297,10 +297,10 @@
             ⚙ Settings
         </button>
 
-        <div class="divider"></div>
+        <!-- <div class="divider"></div>
         <button id="chatBtn" class="chip active" style="color:#0ff; cursor:pointer; border-color:#0ff">
             💬 Chat
-        </button>
+        </button> -->
     </div>
 
     <!-- Detail panel -->
@@ -314,6 +314,12 @@
     <div id="statusBar">
         <span id="flightStatusBar" class="sb-item">✈ 0</span>
         <span id="satStatusBar" class="sb-item">🛰 0</span>
+        <button id="trackISSBtn" onclick="trackISS()" style="
+            background:rgba(255,214,0,0.15); border:1px solid #FFD600;
+            color:#FFD600; border-radius:12px; padding:4px 12px;
+            font-size:12px; font-weight:600; cursor:pointer;
+            pointer-events:auto;
+        ">🛰 Track ISS</button>
     </div>
 
     <!-- Loading -->
@@ -321,7 +327,16 @@
         <div class="spinner"></div>
         <div>🔭 Loading…</div>
     </div>
-
+        <button id="chatBtn" style="
+        position:fixed; bottom:24px; right:24px; z-index:200;
+        width:56px; height:56px; border-radius:50%;
+        background:rgba(0,255,255,0.15); border:2px solid #0ff;
+        color:#0ff; font-size:24px; cursor:pointer;
+        backdrop-filter:blur(8px); box-shadow:0 4px 16px rgba(0,0,0,0.4);
+        transition:all 0.2s;
+    " onmouseover="this.style.background='rgba(0,255,255,0.3)'"
+       onmouseout="this.style.background='rgba(0,255,255,0.15)'"
+    >💬</button>
     <script src="/static/flights.js"></script>
     <script src="/static/satellites.js"></script>
     <script src="/static/detail.js"></script>
