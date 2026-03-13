@@ -5,7 +5,7 @@ from datetime import datetime, timezone, timedelta
 from dataclasses import asdict
 from skyintel.models import NormalizedFlight
 
-RETENTION_HOURS = 24
+RETENTION_HOURS = 6
 
 
 async def insert_flights(db: aiosqlite.Connection, flights: list[NormalizedFlight]):
