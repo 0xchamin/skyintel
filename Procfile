@@ -1,1 +1,1 @@
-web: skyintel serve
+web: pip install . && skyintel serve
