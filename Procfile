@@ -1,1 +1,1 @@
-web: pip install . && skyintel serve
+web: python -m uvicorn skyintel.server:app --host 0.0.0.0 --port 9096
