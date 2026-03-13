@@ -25,6 +25,36 @@
 
 ---
 
+## Deployment Branches
+
+SkyIntel ships two branches optimised for different environments:
+
+| | `main` | `railway` |
+|---|---|---|
+| **Use case** | Self-hosting (home server, VPS, Raspberry Pi) | Cloud demo (Railway, Render, Fly.io) |
+| **Flight data** | OpenSky Network + ADSB.lol | ADSB.lol only (33 regional hubs) |
+| **Poll strategy** | OpenSky global + ADSB.lol military | Regional `/v2/point` × 33 hubs + `/v2/mil` |
+| **Poll interval** | 30s | 60s |
+| **Coverage** | Global (OpenSky provides worldwide states) | ~10,000 flights across 33 major hubs worldwide |
+| **Military** | ADSB.lol `/v2/mil` | ADSB.lol `/v2/mil` (same) |
+| **Satellites/ISS** | ✅ Same | ✅ Same |
+| **AI Chat** | ✅ Same (ADSB.lol live queries) | ✅ Same (ADSB.lol live queries) |
+
+### Why two branches?
+
+**OpenSky Network blocks cloud/datacenter IPs** — their API only responds to residential IPs, making it unusable on Railway, Render, and similar platforms. Rather than degrading the main experience, the `railway` branch replaces OpenSky with **parallel regional polling** of 33 major air-traffic hubs via ADSB.lol's `/v2/point/{lat}/{lon}/99999` endpoint (~100 km radius each).
+
+### Hub coverage
+
+The 33 hubs span **7 regions** — North America (8), Europe (8), Middle East (4), Asia (6), Australia/NZ (2), South America (3), and Africa (2) — selected for commercial volume, military significance, and geographic spread. Despite the per-hub radius limit, this typically captures **10,000+ flights** per poll cycle.
+
+### Which should I use?
+
+- **Running locally or on a VPS with a residential IP?** → Use `main`
+- **Deploying to a cloud platform?** → Use `railway`
+
+---
+
 ## Architecture Overview
 
 ```mermaid
