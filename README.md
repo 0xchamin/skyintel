@@ -426,6 +426,24 @@ Need a managed deployment, custom integrations, SLA support, or additional data 
 
 ---
 
+## Coming Soon — Open Nav Intelligence
+
+SkyIntel is evolving into **Open Nav Intelligence** — a unified real-time tracking platform spanning air, sea, and space.
+
+```bash
+pip install opennav
+```
+
+- 🌊 **Vessel Tracking** — AIS-powered ship monitoring worldwide
+- 🛥️ **Submarine Detection** — Deep-sea intelligence layer
+- ✈️ **Flight Tracking** — Everything SkyIntel does today
+- 🛰️ **Satellite Tracking** — Full orbital awareness
+- 🤖 **AI-Powered Queries** — Multi-domain natural language intelligence
+
+Stay tuned.
+
+---
+
 ## License
 
 Apache 2.0 — see [LICENSE](LICENSE) for details.
