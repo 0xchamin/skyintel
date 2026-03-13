@@ -1,0 +1,1 @@
+web: skyintel serve
