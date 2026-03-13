@@ -1,4 +1,4 @@
-"""Merge flights from ADSB.lol (primary) + OpenSky (supplementary)."""
+"""Merge flights from ADSB.lol regional polls + military."""
 
 import logging
 from skyintel.models import NormalizedFlight
@@ -9,43 +9,29 @@ logger = logging.getLogger(__name__)
 
 def merge_flights(
     adsb_flights: list[NormalizedFlight],
-    opensky_flights: list[NormalizedFlight],
     mil_flights: list[NormalizedFlight],
 ) -> list[NormalizedFlight]:
     """
     Merge strategy:
-      1. ADSB.lol /v2/all is the primary source (unfiltered positions)
-      2. OpenSky supplements with metadata where available
-      3. ADSB.lol /v2/mil tags additional military aircraft
-      4. Classifier catches anything else via callsign/hex/squawk
+      1. ADSB.lol regional polls are the primary source
+      2. ADSB.lol /v2/mil tags additional military aircraft
+      3. Classifier catches anything else via callsign/hex/squawk
     """
-    # Index by icao24
     merged: dict[str, NormalizedFlight] = {}
 
-    # Layer 1: ADSB.lol all (primary)
+    # Layer 1: Regional ADSB.lol (primary)
     for f in adsb_flights:
         merged[f.icao24] = f
 
-    # Layer 2: OpenSky fills in metadata gaps
-    for f in opensky_flights:
+    # Layer 2: Military overlay + add mil-only flights
+    for f in mil_flights:
         if f.icao24 in merged:
-            existing = merged[f.icao24]
-            # Fill any None fields from OpenSky
-            if existing.callsign is None and f.callsign:
-                existing.callsign = f.callsign
-            if existing.squawk is None and f.squawk:
-                existing.squawk = f.squawk
+            merged[f.icao24].aircraft_type = "military"
         else:
-            # OpenSky has aircraft not in ADSB.lol — add it
+            f.aircraft_type = "military"
             merged[f.icao24] = f
 
-    # Layer 3: Military overlay tags
-    mil_icao24s = {f.icao24 for f in mil_flights}
-    for icao24 in mil_icao24s:
-        if icao24 in merged:
-            merged[icao24].aircraft_type = "military"
-
-    # Layer 4: Run classifier on everything
+    # Layer 3: Classify anything the sources missed
     for f in merged.values():
         f.aircraft_type = classify(f)
 

@@ -8,7 +8,6 @@ from starlette.routing import Route
 from starlette.staticfiles import StaticFiles
 
 from skyintel.config import get_settings
-from skyintel.flights.opensky import OpenSkyClient
 from skyintel.flights.adsb_lol import AdsbLolClient
 from skyintel.flights.merge import merge_flights
 from skyintel.flights.repository import insert_flights, get_latest_flights, prune_old_flights
@@ -24,9 +23,6 @@ from starlette.routing import Mount
 from skyintel.mcp_tools import mcp
 from skyintel.llm.gateway import chat as llm_chat
 
-
-
-
 from skyintel.weather.openmeteo import OpenMeteoClient
 
 
@@ -35,15 +31,10 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 WEB_DIR = Path(__file__).parent / "ui" / "web"
 
-opensky = OpenSkyClient(
-    client_id=settings.opensky_client_id,
-    client_secret=settings.opensky_client_secret,
-)
 adsb = AdsbLolClient()
 celestrak = CelestrakClient()
 weather = OpenMeteoClient()
 hexdb = HexdbClient()
-
 
 
 _poll_count = 0
@@ -52,38 +43,30 @@ _last_poll_military = 0
 _satellite_count = 0
 
 
-# ── Flight Poller ────────────────────────────────────────────
+# ── Flight Poller (Regional ADSB.lol) ───────────────────────
 async def flight_poll_loop():
     global _poll_count, _last_poll_total, _last_poll_military
     await asyncio.sleep(2)
-    logger.info("Flight poller started (interval=%ds)", settings.flight_poll_interval)
+    logger.info("Regional flight poller started (interval=%ds)", settings.flight_poll_interval)
 
     while True:
         try:
             db = await get_db(settings.db_path)
-            # adsb_all, opensky_all, adsb_mil = await asyncio.gather(
-            #     adsb.get_all(),
-            #     opensky.get_states(),
-            #     adsb.get_military(),
-            #     return_exceptions=True,
-            # )
-            opensky_all, adsb_mil = await asyncio.gather(
-                opensky.get_states(),
+
+            regional, adsb_mil = await asyncio.gather(
+                adsb.poll_hubs(),
                 adsb.get_military(),
                 return_exceptions=True,
             )
 
-            # if isinstance(adsb_all, Exception):
-            #     logger.error("ADSB.lol all failed: %s", adsb_all)
-            #     adsb_all = []
-            if isinstance(opensky_all, Exception):
-                logger.error("OpenSky failed: %s", opensky_all)
-                opensky_all = []
+            if isinstance(regional, Exception):
+                logger.error("Regional poll failed: %s", regional)
+                regional = []
             if isinstance(adsb_mil, Exception):
                 logger.error("ADSB.lol mil failed: %s", adsb_mil)
                 adsb_mil = []
 
-            merged = merge_flights([], opensky_all, adsb_mil)
+            merged = merge_flights(regional, adsb_mil)
             await insert_flights(db, merged)
 
             _poll_count += 1
@@ -93,7 +76,10 @@ async def flight_poll_loop():
             if _poll_count % 10 == 0:
                 await prune_old_flights(db)
 
-            logger.info("Flight poll #%d: %d flights (%d military)", _poll_count, _last_poll_total, _last_poll_military)
+            logger.info(
+                "Flight poll #%d: %d flights (%d military)",
+                _poll_count, _last_poll_total, _last_poll_military,
+            )
         except Exception:
             logger.exception("Flight poll failed")
 
@@ -127,14 +113,12 @@ async def index(request):
 async def api_status(request):
     return JSONResponse({
         "status": "ok",
-        "opensky_auth": opensky.authenticated,
         "flight_poll_count": _poll_count,
         "last_poll_total": _last_poll_total,
         "last_poll_military": _last_poll_military,
         "satellites_cached": _satellite_count,
         "port": settings.port,
         "cesium_ion_token": settings.cesium_ion_token,
-
     })
 
 async def api_weather(request):
@@ -246,7 +230,6 @@ async def on_startup():
 
 
 async def on_shutdown():
-    await opensky.close()
     await adsb.close()
     await celestrak.close()
     await weather.close()
@@ -275,16 +258,8 @@ app = Starlette(
         Route("/api/chat", api_chat, methods=["POST"]),
         Route("/api/iss", api_iss),
         Route("/api/iss/passes", api_iss_passes),
-
     ],
     lifespan=lifespan,
 )
 
 app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
-
-
-#app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
-#app.mount("/mcp", mcp.streamable_http_app())
-
-
-
