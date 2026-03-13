@@ -9,8 +9,8 @@ description = "Self-hosted MCP server and tactical web app for real-time flight,
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.10"
-authors = [{ name = "Your Name", email = "you@example.com" }]
-keywords = ["mcp", "aviation", "satellite", "tracking", "opensky", "cesium", "osint"]
+authors = [{ name = "0xchamin", email = "chmk90@gmail.com" }]
+keywords = ["mcp", "aviation", "satellite", "tracking", "opensky", "cesium", "osint", "iss", "military", "flight-tracker"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: Web Environment",
@@ -43,19 +43,18 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-chat = ["litellm>=1.80.0"]
 dev = ["pytest", "pytest-asyncio", "ruff", "coverage"]
 
 [project.scripts]
 skyintel = "skyintel.cli:app"
 
 [project.urls]
-Homepage = "https://github.com/youruser/osai"
-Repository = "https://github.com/youruser/osai"
-Issues = "https://github.com/youruser/osai/issues"
+Homepage = "https://github.com/0xchamin/skyintel"
+Repository = "https://github.com/0xchamin/skyintel"
+Issues = "https://github.com/0xchamin/skyintel/issues"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/osai"]
+packages = ["src/skyintel"]
 
 [tool.ruff]
 line-length = 120
@@ -67,4 +66,3 @@ select = ["E", "F", "I", "UP"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
-
