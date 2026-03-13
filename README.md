@@ -326,6 +326,22 @@ Open Sky Intelligence uses a tool-calling architecture where the LLM makes multi
 
 ---
 
+## Roadmap
+
+| Feature | Status |
+|---------|--------|
+| Flight history playback + time slider | 🔜 Planned |
+| Flight pattern recognition + analytics | 🔜 Planned |
+| Alert zones + notifications (browser/webhook) | 🔜 Planned |
+| PostHog analytics | 🔜 Planned |
+| Railway deployment guide | 🔜 Planned |
+| Gemini CLI MCP support | 🔜 Pending verification |
+| OpenAI Codex MCP support | 🔜 Pending verification |
+| Chat panel expand/collapse | 🔜 Planned |
+| `flights_latest` upsert table (storage optimisation) | 🔜 Planned |
+
+---
+
 ## Contributing
 
 Open Sky Intelligence is open source under the Apache 2.0 license. We welcome contributions:
