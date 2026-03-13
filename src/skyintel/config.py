@@ -18,7 +18,9 @@ class Settings(BaseSettings):
     #db_path: Path = Path.home() / ".osai" / "osai.db"
     db_path: Path = Path.home() / ".skyintel" / "skyintel.db"
 
-
+    # hub
+    hub_radius_nm: int = 150
+    
     # Poll intervals (seconds)
     flight_poll_interval: int = 60
     satellite_poll_interval: int = 3600
