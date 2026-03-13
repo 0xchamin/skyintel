@@ -19,9 +19,13 @@ let _cesiumToken = null;
 
 async function initLayers() {
     try {
-        const resp = await fetch("/api/status");
-        const status = await resp.json();
-        _cesiumToken = status.cesium_ion_token;
+        //const resp = await fetch("/api/status");
+        //const status = await resp.json();
+       // _cesiumToken = status.cesium_ion_token;
+       // _cesiumToken = window.__CESIUM_TOKEN__;
+        _cesiumToken = window.__CESIUM_TOKEN__ || null;
+
+
     } catch (e) {}
 
     const picker = document.getElementById("layerPicker");

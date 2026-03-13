@@ -16,6 +16,8 @@ from skyintel.satellites.propagator import propagate_batch
 from skyintel.satellites.repository import upsert_satellites, get_satellites_by_category
 from skyintel.storage.database import get_db, close_db
 from skyintel.flights.hexdb import HexdbClient, get_aircraft_cached, get_route_cached
+from starlette.responses import JSONResponse, FileResponse, HTMLResponse
+
 
 import contextlib
 from starlette.routing import Mount
@@ -107,7 +109,11 @@ async def satellite_poll_loop():
 
 # ── Routes ───────────────────────────────────────────────────
 async def index(request):
-    return FileResponse(WEB_DIR / "index.html")
+    html = (WEB_DIR / "index.html").read_text()
+    token = settings.cesium_ion_token or ""
+    html = html.replace("%%CESIUM_TOKEN%%", token)
+    return HTMLResponse(html)
+
 
 
 async def api_status(request):
@@ -118,7 +124,8 @@ async def api_status(request):
         "last_poll_military": _last_poll_military,
         "satellites_cached": _satellite_count,
         "port": settings.port,
-        "cesium_ion_token": settings.cesium_ion_token,
+        "cesium_configured": settings.cesium_ion_token is not None,
+
     })
 
 async def api_weather(request):
