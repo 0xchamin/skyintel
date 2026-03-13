@@ -117,6 +117,29 @@
             padding: 16px;
         }
 
+        #waitlist {
+        position: absolute;
+        bottom: 12px;
+        left: 12px;
+        z-index: 10;
+        }
+        #waitlist a {
+            background: rgba(20, 20, 30, 0.85);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: #fff;
+            padding: 8px 14px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 13px;
+            display: inline-block;
+        }
+        #waitlist a:hover {
+            background: rgba(40, 40, 60, 0.95);
+            border-color: rgba(255,255,255,0.3);
+        }
+
+
         .detail-header {
             display: flex;
             align-items: center;
@@ -347,6 +370,12 @@
     " onmouseover="this.style.background='rgba(0,255,255,0.3)'"
        onmouseout="this.style.background='rgba(0,255,255,0.15)'"
     >💬</button>
+    <div id="waitlist">
+        <a href="https://buttondown.com/skyintel" target="_blank">
+            🚀 Open Nav Intel — Join Waitlist
+        </a>
+    </div>
+
     <script src="/static/flights.js"></script>
     <script src="/static/satellites.js"></script>
     <script src="/static/detail.js"></script>
