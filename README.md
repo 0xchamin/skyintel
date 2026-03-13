@@ -444,6 +444,16 @@ Stay tuned.
 
 ---
 
+## Disclaimer
+
+Open Sky Intelligence is an **educational project and technical demonstration** showcasing real-time data integration, [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) tool-calling patterns, and AI-powered geospatial intelligence.
+
+All data is sourced from **publicly available open APIs** — no classified, proprietary, or restricted data is used. Flight positions come from [ADSB.lol](https://adsb.lol) and [OpenSky Network](https://opensky-network.org), satellite TLEs from [Celestrak](https://celestrak.org), ISS data from [Open Notify](http://open-notify.org), and weather from [Open-Meteo](https://open-meteo.com).
+
+This project is not affiliated with any government, military, or intelligence agency. Aircraft and satellite positions shown are approximate and should **not** be used for navigation, safety-critical decisions, or operational purposes.
+
+---
+
 ## License
 
 Apache 2.0 — see [LICENSE](LICENSE) for details.
