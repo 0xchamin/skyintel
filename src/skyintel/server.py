@@ -188,6 +188,33 @@ async def api_chat(request):
         logger.error("Chat failed: %s", e)
         return JSONResponse({"error": str(e)}, status_code=500)
 
+async def api_chat_stream(request):
+    """Streaming chat endpoint — SSE."""
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+
+    messages = body.get("messages")
+    provider = body.get("provider")
+    api_key = body.get("api_key")
+    model = body.get("model")
+
+    if not messages or not provider or not api_key or not model:
+        return JSONResponse({"error": "messages, provider, api_key, and model are required"}, status_code=400)
+
+    from skyintel.llm.gateway import chat_stream
+    from starlette.responses import StreamingResponse
+
+    return StreamingResponse(
+        chat_stream(messages, provider, api_key, model),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 async def api_flights(request):
     db = await get_db(settings.db_path)
@@ -349,6 +376,12 @@ async def playground_guardrails(request):
         return JSONResponse({"error": "Playground disabled"}, status_code=403)
     return JSONResponse(await service.get_playground_guardrails())
 
+async def playground_langfuse(request):
+    settings = get_settings()
+    if not settings.playground_enabled:
+        return JSONResponse({"error": "Playground disabled"}, status_code=403)
+    return JSONResponse(await service.get_playground_langfuse())
+
 # ── Lifecycle ────────────────────────────────────────────────
 async def on_startup():
     logger.info("Open Sky Intelligence starting on %s:%d", settings.host, settings.port)
@@ -392,11 +425,14 @@ app = Starlette(
         Route("/api/weather", api_weather),
         Mount("/mcp", app=mcp_app),
         Route("/api/chat", api_chat, methods=["POST"]),
+        Route("/api/chat/stream", api_chat_stream, methods=["POST"]),
         Route("/api/iss", api_iss),
         Route("/api/iss/passes", api_iss_passes),
         Route("/playground", endpoint=playground_page),
         Route("/api/playground/system", endpoint=playground_system),
         Route("/api/playground/guardrails", endpoint=playground_guardrails),
+        Route("/api/playground/langfuse", endpoint=playground_langfuse),
+
     ],
     lifespan=lifespan,
 )

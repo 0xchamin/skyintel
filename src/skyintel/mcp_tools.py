@@ -256,3 +256,12 @@ async def playground_guardrails() -> dict:
     """
     return await service.get_playground_guardrails()
 
+@mcp.tool()
+async def playground_langfuse() -> dict:
+    """Get LangFuse observability analytics for the SkyIntel instance.
+
+    Returns total traces, average latency, token usage (input/output/total),
+    estimated cost by model, tool call frequency, and daily metrics.
+    Covers the last 30 days. Requires LangFuse keys to be configured.
+    """
+    return await service.get_playground_langfuse()

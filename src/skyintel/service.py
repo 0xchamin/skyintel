@@ -235,6 +235,188 @@ async def get_playground_guardrails() -> dict:
             "recent_blocks": [],
         }
 
+async def get_playground_langfuse() -> dict:
+    """LangFuse analytics for playground dashboard."""
+    import json
+    import httpx
+    from base64 import b64encode
+    from datetime import datetime, timezone, timedelta
+    from skyintel.llm.gateway import get_tool_call_counts as _get_tool_call_counts
+
+
+    settings = get_settings()
+
+    if not settings.langfuse_public_key or not settings.langfuse_secret_key:
+        return {"available": False, "reason": "LangFuse keys not configured"}
+
+    host = settings.langfuse_host.rstrip("/")
+    auth_str = f"{settings.langfuse_public_key}:{settings.langfuse_secret_key}"
+    auth_header = f"Basic {b64encode(auth_str.encode()).decode()}"
+    headers = {"Authorization": auth_header}
+
+    now = datetime.now(timezone.utc)
+    from_ts = (now - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    to_ts = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    result = {
+        "available": True,
+        "host": host,
+        "total_traces": 0,
+        "avg_latency_ms": None,
+        "total_tokens": {"input": 0, "output": 0, "total": 0},
+        "cost_by_model": {},
+        "tool_calls": {},
+        "tool_calls": _get_tool_call_counts(),
+
+        "error_count": 0,
+        "daily_metrics": [],
+    }
+
+    async with httpx.AsyncClient(timeout=15.0) as client:
+
+        # ── 1. Total traces (v1 traces API returns meta.totalItems) ──
+        try:
+            resp = await client.get(
+                f"{host}/api/public/traces",
+                params={"limit": 1},
+                headers=headers,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                result["total_traces"] = data.get("meta", {}).get("totalItems", 0)
+        except Exception as e:
+            logger.warning("LangFuse traces fetch failed: %s", e)
+
+        # ── 2. Average latency (v2 metrics — observations view) ──
+        try:
+            query = json.dumps({
+                "view": "observations",
+                "metrics": [{"measure": "latency", "aggregation": "avg"}],
+                "dimensions": [],
+                "filters": [],
+                "fromTimestamp": from_ts,
+                "toTimestamp": to_ts,
+            })
+            resp = await client.get(
+                f"{host}/api/public/v2/metrics",
+                params={"query": query},
+                headers=headers,
+            )
+            if resp.status_code == 200:
+                rows = resp.json().get("data", [])
+                if rows:
+                    val = rows[0].get("latency_avg")
+                    if val is not None:
+                        result["avg_latency_ms"] = round(float(val), 1)
+        except Exception as e:
+            logger.warning("LangFuse latency fetch failed: %s", e)
+
+        # ── 3. Total tokens (v2 metrics) ──
+        try:
+            query = json.dumps({
+                "view": "observations",
+                "metrics": [
+                    {"measure": "inputTokens", "aggregation": "sum"},
+                    {"measure": "outputTokens", "aggregation": "sum"},
+                    {"measure": "totalTokens", "aggregation": "sum"},
+                ],
+                "dimensions": [],
+                "filters": [],
+                "fromTimestamp": from_ts,
+                "toTimestamp": to_ts,
+            })
+            resp = await client.get(
+                f"{host}/api/public/v2/metrics",
+                params={"query": query},
+                headers=headers,
+            )
+            if resp.status_code == 200:
+                rows = resp.json().get("data", [])
+                if rows:
+                    row = rows[0]
+                    result["total_tokens"] = {
+                        "input": int(row.get("inputTokens_sum", 0) or 0),
+                        "output": int(row.get("outputTokens_sum", 0) or 0),
+                        "total": int(row.get("totalTokens_sum", 0) or 0),
+                    }
+        except Exception as e:
+            logger.warning("LangFuse tokens fetch failed: %s", e)
+
+        # ── 4. Cost by model (v2 metrics) ──
+        try:
+            query = json.dumps({
+                "view": "observations",
+                "metrics": [{"measure": "totalCost", "aggregation": "sum"}],
+                "dimensions": [{"field": "providedModelName"}],
+                "filters": [],
+                "fromTimestamp": from_ts,
+                "toTimestamp": to_ts,
+                "orderBy": [{"field": "totalCost_sum", "direction": "desc"}],
+            })
+            resp = await client.get(
+                f"{host}/api/public/v2/metrics",
+                params={"query": query},
+                headers=headers,
+            )
+            if resp.status_code == 200:
+                cost_by_model = {}
+                for row in resp.json().get("data", []):
+                    model = row.get("providedModelName", "unknown")
+                    cost = float(row.get("totalCost_sum", 0) or 0)
+                    if model and cost > 0:
+                        cost_by_model[model] = round(cost, 6)
+                result["cost_by_model"] = cost_by_model
+        except Exception as e:
+            logger.warning("LangFuse cost fetch failed: %s", e)
+
+        # ── 5. Tool call frequency (v2 metrics — count by observation name) ──
+                # ── 5. Tool call frequency (from in-memory gateway tracking) ──
+        try:
+            from skyintel.llm.gateway import get_tool_call_counts
+            result["tool_calls"] = get_tool_call_counts()
+        except ImportError:
+            pass
+
+        # try:
+        #     query = json.dumps({
+        #         "view": "observations",
+        #         "metrics": [{"measure": "count", "aggregation": "count"}],
+        #         "dimensions": [{"field": "name"}],
+        #         "filters": [],
+        #         "fromTimestamp": from_ts,
+        #         "toTimestamp": to_ts,
+        #         "orderBy": [{"field": "count_count", "direction": "desc"}],
+        #     })
+        #     resp = await client.get(
+        #         f"{host}/api/public/v2/metrics",
+        #         params={"query": query},
+        #         headers=headers,
+        #     )
+        #     if resp.status_code == 200:
+        #         tool_calls = {}
+        #         for row in resp.json().get("data", []):
+        #             name = row.get("name", "unknown")
+        #             count = int(row.get("count_count", 0) or 0)
+        #             if name and count > 0:
+        #                 tool_calls[name] = count
+        #         result["tool_calls"] = tool_calls
+        # except Exception as e:
+        #     logger.warning("LangFuse tool calls fetch failed: %s", e)
+
+        # ── 6. Daily metrics (v1 daily endpoint) ──
+        try:
+            resp = await client.get(
+                f"{host}/api/public/metrics/daily",
+                params={"limit": 30},
+                headers=headers,
+            )
+            if resp.status_code == 200:
+                result["daily_metrics"] = resp.json().get("data", [])[:30]
+        except Exception as e:
+            logger.warning("LangFuse daily metrics fetch failed: %s", e)
+
+    return result
+
 async def cleanup():
     """Close all HTTP clients."""
     await _adsb.close()

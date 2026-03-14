@@ -18,11 +18,13 @@
 - 🛰 **Satellite Tracking** — 6 categories (Space Stations, Military, Weather, Nav, Science, Starlink) via Celestrak + SGP4
 - 🚀 **ISS Tracking** — Real-time position, crew info, pass predictions, and one-click Track ISS
 - 🌤 **Weather** — Current conditions at any location via Open-Meteo
-- 🤖 **MCP Server** — 12 tools via FastMCP, streamable HTTP + stdio for Claude Desktop / VS Code / Cursor
+- 🤖 **MCP Server** — 15 tools via FastMCP, streamable HTTP + stdio for Claude Desktop / VS Code / Cursor
 - 💬 **BYOK AI Chat** — Bring your own API key (Claude, OpenAI, Gemini) — keys stored in browser only
+- ⚡ **SSE Streaming** — Server-Sent Events for real-time chat responses with incremental token rendering
 - 🛡️ **Guardrails** — Layered chat safety via system prompt hardening + optional LLM Guard scanners
+- 📊 **Playground Dashboard** — `/playground` — single pane of glass for system health, guardrail monitoring, and LangFuse analytics
 - 🖥 **CLI** — Full command suite including `skyintel ask` for terminal-based AI queries
-- 📊 **LangFuse Observability** — Optional LLM tracing, token tracking, and latency monitoring
+- 📈 **LangFuse Observability** — Optional LLM tracing, token tracking, and latency monitoring with dashboard integration
 
 ---
 
@@ -42,7 +44,9 @@ SkyIntel ships three branches optimised for different environments:
 | **Military** | ADSB.lol `/v2/mil` | ADSB.lol `/v2/mil` (same) | ADSB.lol `/v2/mil` (same) |
 | **Satellites/ISS** | ✅ Same | ✅ Same | ✅ Same |
 | **AI Chat** | ✅ Same (ADSB.lol live queries) | ✅ Same (ADSB.lol live queries) | ✅ Same + guardrail scanning |
-| **PyPI** | — | ✅ `pip install skyintel==1.1.0` | — |
+| **SSE Streaming** | ✅ Same | ✅ Same | ✅ Same |
+| **Playground** | ✅ Same | ✅ Same | ✅ Same + guardrail stats |
+| **PyPI** | — | ✅ `pip install skyintel==1.2.0` | — |
 
 ### Why multiple branches?
 
@@ -73,6 +77,7 @@ graph TB
         HEX[hexdb.io<br/>Aircraft Meta · Routes]
         OM[Open-Meteo<br/>Weather]
         ON[Open Notify<br/>ISS Crew]
+        LF[LangFuse Cloud<br/>OTEL Traces · Analytics]
     end
 
     subgraph Backend["⚙️ Backend · Python · Starlette"]
@@ -84,9 +89,10 @@ graph TB
         SVC[Service Layer<br/>service.py]
         API[REST API<br/>/api/*]
         MCP[MCP Server<br/>FastMCP · /mcp]
-        GW[LLM Gateway<br/>LiteLLM · BYOK]
+        GW[LLM Gateway<br/>LiteLLM · BYOK · SSE]
         GR[Guardrails<br/>LLM Guard · Lazy-loaded<br/>railway-guardrails only]
         PROP[SGP4 Propagator<br/>Skyfield]
+        PG[Playground API<br/>/api/playground/*]
     end
 
     subgraph Storage["💾 SQLite · WAL Mode"]
@@ -96,7 +102,8 @@ graph TB
     subgraph Frontend["🌍 Web UI · Vanilla JS"]
         GLOBE[CesiumJS Globe<br/>BillboardCollection]
         DETAIL[Detail Panel<br/>Click-to-Inspect]
-        CHAT[Chat Panel<br/>BYOK · Tool Calling]
+        CHAT[Chat Panel<br/>BYOK · SSE Streaming]
+        DASH[Playground Dashboard<br/>System · Guardrails · LangFuse]
     end
 
     subgraph Clients["🔌 External Clients"]
@@ -122,15 +129,21 @@ graph TB
     SVC --> MCP
     SVC --> GW
     SVC --> CLI
+    SVC --> PG
     GW --> GR
+    GW -->|OTEL callbacks| LF
+    LF -->|REST API reads| PG
 
     API --> GLOBE
     API --> DETAIL
     GW --> CHAT
+    PG --> DASH
 
     MCP --> CD
     MCP --> VS
 ```
+
+SkyIntel is a **Python/Starlette backend** with a **vanilla JS + CesiumJS frontend** and no build step. Background pollers fetch flight data from ADSB.lol (global point query + military feed) and satellite TLEs from Celestrak on fixed intervals, storing results in a SQLite database with WAL mode for concurrent reads during writes. A shared **service layer** (`service.py`) provides unified query logic consumed by three surfaces: the REST API (globe + detail panel), the MCP server (Claude Desktop / VS Code / Cursor), and the CLI. The **LLM gateway** (`gateway.py`) implements a provider-agnostic tool-calling loop via LiteLLM, supporting Claude, OpenAI, and Gemini through a single BYOK interface — with SSE streaming for real-time token delivery. The `/playground` dashboard provides an observability surface with system metrics sourced from in-memory runtime stats, guardrail monitoring via the optional LLM Guard module (graceful degradation when absent), and LangFuse analytics via REST API reads. All flight classification (military, private, commercial) is performed through pattern-based heuristics in the classifier module, and satellite positions are computed locally via SGP4 propagation using Skyfield.
 
 ---
 
@@ -150,7 +163,10 @@ graph TB
 | **Vanilla JS, no build step** | Pure JS + CesiumJS CDN | Zero frontend toolchain complexity. No npm, no webpack, no transpilation. Deploy by copying files |
 | **FastMCP dual transport** | Streamable HTTP (`/mcp`) + stdio mode | HTTP for remote/web clients (VS Code, Cursor), stdio for local desktop clients (Claude Desktop) |
 | **LiteLLM as LLM gateway** | Unified API for Claude, OpenAI, Gemini | Single tool-calling implementation supports all major providers via provider prefixes |
-| **LangFuse OTEL integration** | Optional observability via LiteLLM callbacks | Zero-code tracing of every LLM call, tool invocation, token usage, and latency. Opt-in via env vars |
+| **LangFuse OTEL integration** | Optional observability via LiteLLM callbacks + REST API reads for playground | Zero-code tracing of every LLM call. OTEL ingestion for writes, REST API for dashboard reads. Single host, shared credentials |
+| **SSE streaming (simple approach)** | Full tool-calling loop runs server-side, only the final LLM response is streamed | Avoids complex partial-stream/tool-call interleaving. Tool status messages sent during processing, final reply streamed token-by-token via Server-Sent Events |
+| **Playground observability** | In-memory runtime stats + LangFuse REST API + graceful degradation | System metrics from `playground_runtime` dict (zero DB overhead), guardrail stats from LLM Guard module (ImportError fallback when absent), LangFuse analytics via REST API (returns `available: false` without keys) |
+| **Tool call tracking** | In-memory counters in gateway.py | Accurate per-tool heatmap without LangFuse dependency. Tracks actual MCP tool names (not LiteLLM span names). Resets on restart — acceptable for operational monitoring |
 
 ### Guardrails Strategy
 
@@ -163,6 +179,8 @@ SkyIntel uses a **layered defense** approach for chat safety:
 | **LLM Guard (full)** | Adds `PromptInjection`, `NoRefusal` scanners | ~1.3GB+ models — higher memory cost | Not shipped (see below) |
 
 The heavy `PromptInjection` scanner (~738MB) and `NoRefusal` scanner (~827MB) were excluded in favour of system prompt hardening — a deliberate **cost/security tradeoff** for cloud deployments where memory is billed per GB/hour. The system prompt approach provides effective topic restriction at zero additional cost, while the lightweight scanners add defense-in-depth against invisible text attacks, toxic content, and off-topic abuse.
+
+On the `railway-guardrails` branch, guardrail scan and block stats are tracked in-memory and surfaced in the `/playground` dashboard — including per-scanner block counts, block rate, and the 20 most recent blocked queries (anonymised).
 
 ### Aircraft Classification
 
@@ -185,6 +203,7 @@ These patterns are maintained for **educational purposes** and are best-effort, 
 | **hexdb.io** | Aircraft metadata + route lookup | None | Cached (30d/7d) | Can go down intermittently. Errors handled gracefully |
 | **Open-Meteo** | Weather at any location | None | On-demand | Free, no API key required |
 | **Open Notify** | ISS crew information | None | On-demand | Only reliable free source for current ISS crew |
+| **LangFuse** | LLM observability + playground analytics | BYOK keys | OTEL callbacks + REST reads | Free tier. Trace count + tool heatmap surfaced in `/playground` |
 
 > ⚠️ **Why different data for Globe vs Chat?** (`main` branch) The globe reads from SQLite (polled via OpenSky), while chat queries ADSB.lol live. This separation isolates polling from on-demand queries — avoids API rate limit contention and ensures globe rendering never competes with user queries. Flight counts may differ slightly — this is expected and by design.
 
@@ -198,7 +217,7 @@ These patterns are maintained for **educational purposes** and are best-effort, 
 pip install skyintel
 ```
 
-> ℹ️ `pip install skyintel` (v1.1.0) installs the `railway` branch version — ADSB.lol only, no OpenSky dependency. For the self-hosted version with OpenSky support, clone the `main` branch directly.
+> ℹ️ `pip install skyintel` (v1.2.0) installs the `railway` branch version — ADSB.lol only, no OpenSky dependency. For the self-hosted version with OpenSky support, clone the `main` branch directly.
 
 Create a `.env` file in your project root:
 
@@ -238,10 +257,14 @@ SKYINTEL_LLM_PROVIDER=anthropic          # anthropic / openai / google
 SKYINTEL_LLM_API_KEY=sk-ant-...
 SKYINTEL_LLM_MODEL=claude-sonnet-4-20250514
 
-# LangFuse (optional — LLM observability)
+# LangFuse (optional — LLM observability + playground analytics)
 SKYINTEL_LANGFUSE_PUBLIC_KEY=pk-lf-...
 SKYINTEL_LANGFUSE_SECRET_KEY=sk-lf-...
 SKYINTEL_LANGFUSE_HOST=https://cloud.langfuse.com
+SKYINTEL_LANGFUSE_OTEL_HOST=https://cloud.langfuse.com
+
+# Playground (opt-in observability dashboard)
+SKYINTEL_PLAYGROUND_ENABLED=true         # default: true
 
 # Poll intervals
 SKYINTEL_FLIGHT_POLL_INTERVAL=30         # 30s for main, 60s for railway
@@ -339,6 +362,41 @@ CLI helper: `skyintel mcp-config`, `skyintel mcp-config --vscode`, or `skyintel 
 | `iss_position` | Real-time ISS position |
 | `iss_crew` | Current ISS crew members |
 | `iss_passes` | ISS pass predictions for a location |
+| `playground_system` | System health metrics — flights, satellites, polling, DB, data sources |
+| `playground_guardrails` | Guardrail scan/block stats — scanner status, recent blocks |
+| `playground_langfuse` | LangFuse analytics — traces, tool call frequency |
+
+---
+
+## Playground Dashboard
+
+The `/playground` route provides an **AI engineering observability surface** — a single pane of glass for system health, guardrail monitoring, and LangFuse analytics.
+
+### System Metrics
+
+- **Flights tracked** — total with commercial/military/private breakdown (from live poll data)
+- **Satellites cached** — count and categories
+- **Polling & uptime** — poll cycle count, uptime, poll intervals
+- **Database** — SQLite file size, retention policy, path
+- **Data source health** — live status for ADSB.lol, Celestrak, hexdb.io, Open-Meteo
+- **LLM configuration** — provider, model, API key status, LangFuse status
+
+### Guardrails Monitor
+
+- **Scan counts** — input and output scans performed
+- **Block rate** — blocked count and percentage
+- **Scanner status** — loaded / lazy / unavailable for each scanner
+- **Recent blocked queries** — last 20 blocked inputs (anonymised)
+- Gracefully degrades to "available on railway-guardrails branch" when LLM Guard is not installed
+
+### LangFuse Analytics
+
+- **Chat sessions** — total trace count from LangFuse
+- **Tool call frequency** — heatmap of MCP tool usage (in-memory tracking for accuracy)
+- **Open LangFuse Dashboard** — one-click link to the full LangFuse UI
+- Gracefully hidden when LangFuse keys are not configured
+
+Auto-refreshes every 15 seconds. Dark theme, card-based grid, fully responsive.
 
 ---
 
@@ -350,7 +408,8 @@ CLI helper: `skyintel mcp-config`, `skyintel mcp-config --vscode`, or `skyintel 
 - **Track ISS** — Click the 🛰 Track ISS button in the status bar to rotate the globe to the ISS and open the crew/status panel.
 - **Layers** — Switch between Dark, Satellite, Streets, and Terrain (terrain requires free Cesium Ion token).
 - **Share** — Snapshot your current view and share via URL or Web Share API.
-- **Chat** — Click the 💬 floating button to open the AI chat. Set your API key in ⚙ Settings first.
+- **Chat** — Click the 💬 floating button to open the AI chat. Set your API key in ⚙ Settings first. Responses stream in real-time via SSE.
+- **Playground** — Navigate to `/playground` for system health, guardrail stats, and LangFuse analytics.
 
 > **Note:** Terrain view may take time to render.
 
@@ -363,6 +422,7 @@ CLI helper: `skyintel mcp-config`, `skyintel mcp-config --vscode`, or `skyintel 
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/` | Web UI |
+| GET | `/playground` | Playground dashboard |
 | GET | `/api/status` | System status + config |
 | GET | `/api/flights?lat_min&lat_max&lon_min&lon_max` | Cached flights (bbox) |
 | GET | `/api/aircraft/{icao24}` | Aircraft metadata |
@@ -372,6 +432,10 @@ CLI helper: `skyintel mcp-config`, `skyintel mcp-config --vscode`, or `skyintel 
 | GET | `/api/iss` | ISS position + crew |
 | GET | `/api/iss/passes?lat=&lon=` | ISS pass predictions |
 | POST | `/api/chat` | BYOK chat (messages, provider, api_key, model) |
+| POST | `/api/chat/stream` | BYOK chat with SSE streaming |
+| GET | `/api/playground/system` | System health metrics |
+| GET | `/api/playground/guardrails` | Guardrail scan/block stats |
+| GET | `/api/playground/langfuse` | LangFuse analytics |
 | POST | `/mcp` | MCP streamable HTTP endpoint |
 
 ---
@@ -384,6 +448,7 @@ Open Sky Intelligence uses a tool-calling architecture where the LLM makes multi
 - **Result capping** — Tool results default to 50 items with `total_count` always returned, preventing context window blowout.
 - **Retry with backoff** — Rate limit errors trigger automatic retries (up to 3 attempts, 30s/60s waits).
 - **Dual system prompts** — Web chat uses HTML formatting, CLI uses markdown, keeping responses lean per surface.
+- **SSE streaming** — Final LLM response streamed token-by-token via Server-Sent Events for perceived responsiveness. Tool-calling loop completes server-side before streaming begins.
 
 > 💡 **Tip:** Clear chat history before complex queries for best results. Users on free-tier LLM plans should consider lighter models (e.g. `claude-haiku-4-20250514`, `gpt-4o-mini`).
 
@@ -395,17 +460,30 @@ Open Sky Intelligence uses a tool-calling architecture where the LLM makes multi
 
 | Feature | Status |
 |---------|--------|
+| `/playground` dashboard — system metrics + guardrails monitor | ✅ Done |
+| `/playground` dashboard — LangFuse analytics (traces, tool heatmap) | ✅ Done |
+| SSE streaming responses | ✅ Done |
+| Chat panel expand/collapse | ✅ Done |
+| LangFuse v2 Metrics API (latency, tokens, cost in playground) | 🔜 Planned |
+| Guardrail threshold tuning + block rate improvement | 🔜 Planned |
+| Tool result caching — TTL-based (30-60s) on service layer | 🔜 Planned |
+| Context window tracking — `tiktoken` token counting | 🔜 Planned |
+| Hallucination detection — compare LLM response against tool results | 🔜 Planned |
 | Flight history playback + time slider | 🔜 Planned |
 | Flight pattern recognition + analytics | 🔜 Planned |
 | Alert zones + notifications (browser/webhook) | 🔜 Planned |
-| `/playground` dashboard (LangFuse metrics, guardrail stats, test bench) | 🔜 Planned |
 | PostHog analytics | 🔜 Planned |
 | E2E testing for PyPI install | 🔜 Planned |
 | Raspberry Pi deployment guide | 🔜 Planned |
 | Gemini CLI MCP support | 🔜 Pending verification |
 | OpenAI Codex MCP support | 🔜 Pending verification |
-| Chat panel expand/collapse | 🔜 Planned |
 | `flights_latest` upsert table (storage optimisation) | 🔜 Planned |
+| Evaluation scoring (LangFuse Scores + DeepEval) | 🔮 Future |
+| PII / Data masking (Presidio) | 🔮 Future |
+| Rate limiting (slowapi) | 🔮 Future |
+| Anomaly detection (scikit-learn IsolationForest) | 🔮 Future |
+| Military activity trends (pandas + numpy) | 🔮 Future |
+| Ship/vessel tracking (AIS — Open Nav Intelligence) | 🔮 Future |
 
 ---
 
