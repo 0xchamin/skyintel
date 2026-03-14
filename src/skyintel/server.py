@@ -1,11 +1,15 @@
 import asyncio
 import logging
+import time
+import os
+from datetime import datetime, timezone
 from pathlib import Path
 from dataclasses import asdict
 from starlette.applications import Starlette
-from starlette.responses import JSONResponse, FileResponse
-from starlette.routing import Route
+from starlette.responses import JSONResponse, FileResponse, HTMLResponse
+from starlette.routing import Route, Mount
 from starlette.staticfiles import StaticFiles
+import contextlib
 
 from skyintel.config import get_settings
 from skyintel.flights.adsb_lol import AdsbLolClient
@@ -16,16 +20,12 @@ from skyintel.satellites.propagator import propagate_batch
 from skyintel.satellites.repository import upsert_satellites, get_satellites_by_category
 from skyintel.storage.database import get_db, close_db
 from skyintel.flights.hexdb import HexdbClient, get_aircraft_cached, get_route_cached
-from starlette.responses import JSONResponse, FileResponse, HTMLResponse
-
-
-import contextlib
-from starlette.routing import Mount
-
 from skyintel.mcp_tools import mcp
 from skyintel.llm.gateway import chat as llm_chat
-
 from skyintel.weather.openmeteo import OpenMeteoClient
+from skyintel.service import playground_runtime
+from skyintel import service
+
 
 
 logger = logging.getLogger(__name__)
@@ -37,7 +37,6 @@ adsb = AdsbLolClient()
 celestrak = CelestrakClient()
 weather = OpenMeteoClient()
 hexdb = HexdbClient()
-
 
 _poll_count = 0
 _last_poll_total = 0
@@ -71,6 +70,11 @@ async def flight_poll_loop():
             merged = merge_flights(regional, adsb_mil)
             await insert_flights(db, merged)
 
+            playground_runtime["flights_commercial"] = sum(1 for f in merged if f.aircraft_type == "commercial")
+            playground_runtime["flights_military"] = sum(1 for f in merged if f.aircraft_type == "military")
+            playground_runtime["flights_private"] = sum(1 for f in merged if f.aircraft_type == "private")
+
+
             _poll_count += 1
             _last_poll_total = len(merged)
             _last_poll_military = sum(1 for f in merged if f.aircraft_type == "military")
@@ -82,8 +86,23 @@ async def flight_poll_loop():
                 "Flight poll #%d: %d flights (%d military)",
                 _poll_count, _last_poll_total, _last_poll_military,
             )
-        except Exception:
+
+              
+            logger.info("DEBUG playground_runtime flights: c=%d m=%d p=%d",
+                playground_runtime["flights_commercial"],
+                playground_runtime["flights_military"],
+                playground_runtime["flights_private"])
+
+            playground_runtime["poll_count"] = _poll_count
+            playground_runtime["last_flight_poll"] = datetime.now(timezone.utc).isoformat()
+            playground_runtime["source_health"]["adsb_lol"]["healthy"] = True
+            playground_runtime["source_health"]["adsb_lol"]["last_success"] = playground_runtime["last_flight_poll"]
+            playground_runtime["source_health"]["adsb_lol"]["error"] = None
+
+        except Exception as e:
             logger.exception("Flight poll failed")
+            playground_runtime["source_health"]["adsb_lol"]["healthy"] = False
+            playground_runtime["source_health"]["adsb_lol"]["error"] = str(e)
 
         await asyncio.sleep(settings.flight_poll_interval)
 
@@ -101,8 +120,16 @@ async def satellite_poll_loop():
             await upsert_satellites(db, sats)
             _satellite_count = len(sats)
             logger.info("Satellite poll: %d TLEs cached", _satellite_count)
-        except Exception:
+
+            playground_runtime["last_sat_poll"] = datetime.now(timezone.utc).isoformat()
+            playground_runtime["source_health"]["celestrak"]["healthy"] = True
+            playground_runtime["source_health"]["celestrak"]["last_success"] = playground_runtime["last_sat_poll"]
+            playground_runtime["source_health"]["celestrak"]["error"] = None
+
+        except Exception as e:
             logger.exception("Satellite poll failed")
+            playground_runtime["source_health"]["celestrak"]["healthy"] = False
+            playground_runtime["source_health"]["celestrak"]["error"] = str(e)
 
         await asyncio.sleep(settings.satellite_poll_interval)
 
@@ -115,7 +142,6 @@ async def index(request):
     return HTMLResponse(html)
 
 
-
 async def api_status(request):
     return JSONResponse({
         "status": "ok",
@@ -125,8 +151,8 @@ async def api_status(request):
         "satellites_cached": _satellite_count,
         "port": settings.port,
         "cesium_configured": settings.cesium_ion_token is not None,
-
     })
+
 
 async def api_weather(request):
     """Get current weather at a lat/lon."""
@@ -138,6 +164,7 @@ async def api_weather(request):
     if data is None:
         return JSONResponse({"error": "weather fetch failed"}, status_code=502)
     return JSONResponse(data)
+
 
 async def api_chat(request):
     """Chat endpoint — proxies to LLM with tool calling."""
@@ -161,6 +188,7 @@ async def api_chat(request):
         logger.error("Chat failed: %s", e)
         return JSONResponse({"error": str(e)}, status_code=500)
 
+
 async def api_flights(request):
     db = await get_db(settings.db_path)
     lat_min = float(request.query_params.get("lat_min", -90))
@@ -171,6 +199,7 @@ async def api_flights(request):
     for f in flights:
         f.pop("latest", None)
     return JSONResponse(flights)
+
 
 async def api_aircraft(request):
     """Get aircraft metadata by ICAO24 hex code."""
@@ -204,6 +233,7 @@ async def api_satellites(request):
     positions = propagate_batch(tles)
     return JSONResponse(positions)
 
+
 # ── ISS ────────────────────────────────────────────────
 async def api_iss(request):
     """Get current ISS position + crew."""
@@ -225,6 +255,100 @@ async def api_iss_passes(request):
     return JSONResponse(result)
 
 
+# ── Playground ───────────────────────────────────────────────
+async def playground_page(request):
+    settings = get_settings()
+    if not settings.playground_enabled:
+        return JSONResponse({"error": "Playground disabled"}, status_code=403)
+    html_path = Path(__file__).parent / "ui" / "playground" / "playground.html"
+    return HTMLResponse(html_path.read_text())
+
+
+# async def playground_system(request):
+#     settings = get_settings()
+#     if not settings.playground_enabled:
+#         return JSONResponse({"error": "Playground disabled"}, status_code=403)
+#     db = await get_db(settings.db_path)
+
+#     # Flight counts by type
+#     row = await db.execute(
+#         """SELECT
+#             COUNT(*) as total,
+#             SUM(CASE WHEN aircraft_type='commercial' THEN 1 ELSE 0 END) as commercial,
+#             SUM(CASE WHEN aircraft_type='military' THEN 1 ELSE 0 END) as military,
+#             SUM(CASE WHEN aircraft_type='private' THEN 1 ELSE 0 END) as private
+#         FROM flights
+#         WHERE timestamp > datetime('now', '-2 minutes')"""
+#     )
+#     counts = await row.fetchone()
+
+#     # Satellite count + categories
+#     sat_row = await db.execute("SELECT COUNT(*) as total, COUNT(DISTINCT category) as cats FROM satellites")
+#     sat_counts = await sat_row.fetchone()
+
+#     # DB file size
+#     db_size = None
+#     try:
+#         db_size = os.path.getsize(settings.db_path)
+#     except OSError:
+#         pass
+
+#     uptime = time.time() - playground_runtime["start_time"] if playground_runtime["start_time"] else None
+
+#     return JSONResponse({
+#         "flights_commercial": counts["commercial"] if counts else 0,
+#         "flights_military": counts["military"] if counts else 0,
+#         "flights_private": counts["private"] if counts else 0,
+#         "satellites_cached": sat_counts["total"] if sat_counts else 0,
+#         "satellite_categories": sat_counts["cats"] if sat_counts else 0,
+#         "poll_count": playground_runtime["poll_count"],
+#         "uptime_seconds": round(uptime, 1) if uptime else None,
+#         "last_flight_poll": playground_runtime["source_health"]["adsb_lol"]["last_success"],
+#         "last_sat_poll": playground_runtime["source_health"]["celestrak"]["last_success"],
+#         "flight_poll_interval": settings.flight_poll_interval,
+#         "satellite_poll_interval": settings.satellite_poll_interval,
+#         "db_size_bytes": db_size,
+#         "db_path": str(settings.db_path),
+#         "sources": playground_runtime["source_health"],
+#         "llm_provider": settings.llm_provider,
+#         "llm_model": settings.llm_model,
+#         "llm_api_key_set": bool(settings.llm_api_key),
+#         "langfuse_configured": bool(settings.langfuse_public_key and settings.langfuse_secret_key),
+#     })
+
+
+# async def playground_guardrails(request):
+#     settings = get_settings()
+#     if not settings.playground_enabled:
+#         return JSONResponse({"error": "Playground disabled"}, status_code=403)
+#     try:
+#         from skyintel.llm.guardrails import get_guardrail_stats
+#         stats = get_guardrail_stats()
+#         return JSONResponse({**stats, "available": True})
+#     except ImportError:
+#         return JSONResponse({
+#             "available": False,
+#             "input_scans": 0,
+#             "output_scans": 0,
+#             "blocked_count": 0,
+#             "blocked_by_scanner": {},
+#             "scanners": [],
+#             "recent_blocks": [],
+#         })
+
+async def playground_system(request):
+    settings = get_settings()
+    if not settings.playground_enabled:
+        return JSONResponse({"error": "Playground disabled"}, status_code=403)
+    return JSONResponse(await service.get_playground_system())
+
+
+async def playground_guardrails(request):
+    settings = get_settings()
+    if not settings.playground_enabled:
+        return JSONResponse({"error": "Playground disabled"}, status_code=403)
+    return JSONResponse(await service.get_playground_guardrails())
+
 # ── Lifecycle ────────────────────────────────────────────────
 async def on_startup():
     logger.info("Open Sky Intelligence starting on %s:%d", settings.host, settings.port)
@@ -243,14 +367,19 @@ async def on_shutdown():
     await close_db()
     logger.info("Open Sky Intelligence stopped")
 
+
 mcp_app = mcp.http_app(path="/")
+
+
 # ── App ──────────────────────────────────────────────────────
 @contextlib.asynccontextmanager
 async def lifespan(app):
+    playground_runtime["start_time"] = time.time()
     await on_startup()
     async with mcp_app.router.lifespan_context(app):
         yield
     await on_shutdown()
+
 
 app = Starlette(
     routes=[
@@ -265,8 +394,12 @@ app = Starlette(
         Route("/api/chat", api_chat, methods=["POST"]),
         Route("/api/iss", api_iss),
         Route("/api/iss/passes", api_iss_passes),
+        Route("/playground", endpoint=playground_page),
+        Route("/api/playground/system", endpoint=playground_system),
+        Route("/api/playground/guardrails", endpoint=playground_guardrails),
     ],
     lifespan=lifespan,
 )
 
 app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
+app.mount("/playground", StaticFiles(directory=str(Path(__file__).parent / "ui" / "playground")), name="playground_static")
