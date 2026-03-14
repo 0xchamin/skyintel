@@ -302,7 +302,7 @@ async function sendMessage() {
 
     try {
         const history = getChatHistory().slice(-6);
-        const resp = await fetch("/api/chat", {
+        const resp = await fetch("/api/chat/stream", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -313,16 +313,62 @@ async function sendMessage() {
             }),
         });
 
-        removeElement(thinking);
-
         if (!resp.ok) {
+            removeElement(thinking);
             const err = await resp.json().catch(() => ({ error: "Request failed" }));
             appendMessage("error", `Error: ${err.error || resp.statusText}`, false);
             return;
         }
 
-        const data = await resp.json();
-        appendMessage("assistant", data.reply);
+        removeElement(thinking);
+
+        // Create assistant message bubble and stream into it
+        let fullText = "";
+        const msgEl = appendMessage("assistant", "", false);
+
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop(); // keep incomplete line in buffer
+
+            for (const line of lines) {
+                if (!line.startsWith("data: ")) continue;
+                const payload = line.slice(6).trim();
+                if (payload === "[DONE]") break;
+
+                try {
+                    const event = JSON.parse(payload);
+                    if (event.type === "text") {
+                        fullText += event.content;
+                        msgEl.innerHTML = renderMarkdown(fullText);
+                    } else if (event.type === "status") {
+                        msgEl.innerHTML = `<em style="color:rgba(255,255,255,0.4)">${event.content}</em>`;
+                    } else if (event.type === "error") {
+                        msgEl.innerHTML = `<span style="color:#ef5350">Error: ${event.content}</span>`;
+                    }
+                } catch (e) {
+                    // skip malformed events
+                }
+
+                // Auto-scroll
+                const container = document.getElementById("chatMessages");
+                if (container) container.scrollTop = container.scrollHeight;
+            }
+        }
+
+        // Save to chat history
+        if (fullText) {
+            const chatHistory = getChatHistory();
+            chatHistory.push({ role: "assistant", content: fullText });
+            saveChatHistory(chatHistory);
+        }
 
     } catch (e) {
         removeElement(thinking);
@@ -332,6 +378,8 @@ async function sendMessage() {
         input.focus();
     }
 }
+
+
 
 // Simple markdown → HTML renderer
 function renderMarkdown(text) {

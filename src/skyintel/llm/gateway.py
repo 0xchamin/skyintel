@@ -331,3 +331,95 @@ async def chat(
             return choice.message.content or ""
 
     return "I reached the maximum number of tool calls. Please try a simpler query."
+
+async def chat_stream(
+    messages: list[dict],
+    provider: str,
+    api_key: str,
+    model: str,
+):
+    """Run chat with tool-calling loop, then stream the final response.
+
+    Yields SSE-formatted strings: 'data: {chunk}\n\n'
+    Tool calls are resolved server-side before streaming begins.
+    """
+    from litellm import acompletion
+
+    prefix = PROVIDER_PREFIX.get(provider, "")
+    litellm_model = f"{prefix}{model}"
+
+    full_messages = [{"role": "system", "content": SYSTEM_PROMPT}] + messages
+
+    # ── Resolve all tool calls (non-streaming) ──
+    for _ in range(MAX_TOOL_ROUNDS):
+        for attempt in range(3):
+            try:
+                response = await acompletion(
+                    model=litellm_model,
+                    messages=full_messages,
+                    tools=TOOLS,
+                    api_key=api_key,
+                )
+                break
+            except Exception as e:
+                if "rate_limit" in str(e).lower() and attempt < 2:
+                    wait = (attempt + 1) * 30
+                    logger.warning("Rate limited, retrying in %ds (attempt %d/3)", wait, attempt + 1)
+                    await _asyncio.sleep(wait)
+                else:
+                    raise
+
+        choice = response.choices[0]
+
+        if choice.finish_reason == "tool_calls" or (choice.message.tool_calls and len(choice.message.tool_calls) > 0):
+            full_messages.append(choice.message.model_dump())
+
+            for tc in choice.message.tool_calls:
+                args = json.loads(tc.function.arguments) if isinstance(tc.function.arguments, str) else tc.function.arguments
+                logger.info("Tool call: %s(%s)", tc.function.name, args)
+                _tool_call_counts[tc.function.name] = _tool_call_counts.get(tc.function.name, 0) + 1
+                result = await execute_tool(tc.function.name, args)
+                full_messages.append({
+                    "role": "tool",
+                    "tool_call_id": tc.id,
+                    "content": result,
+                })
+
+            # Signal tool activity to client
+            yield f"data: {json.dumps({'type': 'status', 'content': '🔍 Analysing data...'})}\n\n"
+        else:
+            # No more tool calls — stream the final response
+            break
+    else:
+        yield f"data: {json.dumps({'type': 'text', 'content': 'I reached the maximum number of tool calls. Please try a simpler query.'})}\n\n"
+        yield "data: [DONE]\n\n"
+        return
+
+    # ── Stream the final LLM response ──
+    try:
+        stream = await acompletion(
+            model=litellm_model,
+            messages=full_messages,
+            tools=TOOLS,
+            api_key=api_key,
+            stream=True,
+        )
+
+        async for chunk in stream:
+            try:
+                choices = getattr(chunk, "choices", None)
+                if not choices:
+                    continue
+                delta = choices[0].delta
+                if delta and getattr(delta, "content", None):
+                    yield f"data: {json.dumps({'type': 'text', 'content': delta.content})}\n\n"
+            except (IndexError, AttributeError):
+                continue
+
+    except Exception as e:
+        logger.error("Stream failed: %s", e)
+        yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
+
+    yield "data: [DONE]\n\n"
+
+
