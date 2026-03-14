@@ -25,7 +25,7 @@ def status():
     table.add_row("Port", str(settings.port))
     table.add_row("Database", str(settings.db_path))
     table.add_row("DB exists", "✓" if settings.db_path.exists() else "✗")
-    table.add_row("OpenSky OAuth2", "✓ configured" if settings.opensky_configured else "✗ not set")
+    table.add_row("Data source", "ADSB.lol (global feed)")
     table.add_row("Flight poll", f"{settings.flight_poll_interval}s")
     table.add_row("Satellite poll", f"{settings.satellite_poll_interval}s")
     table.add_row("LLM", f"{settings.llm_provider} / {settings.llm_model}" if settings.llm_configured else "✗ not set")
