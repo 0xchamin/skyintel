@@ -9,6 +9,15 @@ app = typer.Typer(
 )
 console = Console()
 
+def version_callback(value: bool):
+    if value:
+        from importlib.metadata import version
+        console.print(f"skyintel {version('skyintel')}")
+        raise typer.Exit()
+
+@app.callback()
+def main(version: bool = typer.Option(False, "--version", "-v", callback=version_callback, is_eager=True, help="Show version")):
+    pass
 
 @app.command()
 def status():
