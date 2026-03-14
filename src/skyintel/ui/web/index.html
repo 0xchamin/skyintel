@@ -117,11 +117,12 @@
             padding: 16px;
         }
 
-        #waitlist {
-        position: absolute;
-        bottom: 12px;
-        left: 12px;
-        z-index: 10;
+        /* #waitlist {
+            position: absolute;
+            bottom: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
         }
         #waitlist a {
             background: rgba(20, 20, 30, 0.85);
@@ -137,7 +138,7 @@
         #waitlist a:hover {
             background: rgba(40, 40, 60, 0.95);
             border-color: rgba(255,255,255,0.3);
-        }
+        } */
 
 
         .detail-header {
@@ -352,9 +353,11 @@
             color:rgba(255,214,0,0.6); text-decoration:none; font-size:12px;
             pointer-events:auto; transition:color 0.2s;
         " onmouseover="this.style.color='#FFD600'" onmouseout="this.style.color='rgba(255,214,0,0.6)'">☕ Support</a>
-
-    </div>
-
+         <a href="https://buttondown.com/skyintel" target="_blank" style="
+            color:rgba(255,255,255,0.6); text-decoration:none; font-size:12px;
+            pointer-events:auto; transition:color 0.2s;
+            " onmouseover="this.style.color='#fff'" onmouseout="this.style.color='rgba(255,255,255,0.6)'">🚀 Join Waitlist Now!!!</a>
+    </div> 
     <!-- Loading -->
     <div id="loadingOverlay">
         <div class="spinner"></div>
@@ -370,11 +373,11 @@
     " onmouseover="this.style.background='rgba(0,255,255,0.3)'"
        onmouseout="this.style.background='rgba(0,255,255,0.15)'"
     >💬</button>
-    <div id="waitlist">
+    <!-- <div id="waitlist">
         <a href="https://buttondown.com/skyintel" target="_blank">
-            🚀 Open Nav Intel — Join Waitlist
+            🚀 Open Nav Intel is Coming Soon — Join Waitlist Now!!!
         </a>
-    </div>
+    </div> -->
 
     <script src="/static/flights.js"></script>
     <script src="/static/satellites.js"></script>
