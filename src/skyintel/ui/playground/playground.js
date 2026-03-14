@@ -216,6 +216,94 @@ async function fetchGuardrails() {
     }
 }
 
+// ── Fetch LangFuse Analytics ──────────────────────────────
+async function fetchLangfuse() {
+    const section = document.getElementById("langfuseSection");
+    try {
+        const resp = await fetch("/api/playground/langfuse");
+        if (!resp.ok) throw new Error(resp.status);
+        const d = await resp.json();
+
+        if (!d.available) {
+            if (section) section.style.display = "none";
+            return;
+        }
+
+        if (section) section.style.display = "block";
+
+        // Total traces
+        setText("lfTraces", fmt(d.total_traces));
+
+        // Avg latency
+        if (d.avg_latency_ms !== null) {
+            const secs = d.avg_latency_ms / 1000;
+            setText("lfLatency", secs >= 1 ? secs.toFixed(1) + "s" : Math.round(d.avg_latency_ms) + "ms");
+        } else {
+            setText("lfLatency", "--");
+        }
+
+        // Tokens
+        setText("lfTokensTotal", fmt(d.total_tokens?.total));
+        setText("lfTokensInput", fmt(d.total_tokens?.input));
+        setText("lfTokensOutput", fmt(d.total_tokens?.output));
+
+        // Cost by model
+        const costs = d.cost_by_model || {};
+        const costKeys = Object.keys(costs);
+        if (costKeys.length > 0) {
+            setHTML("lfCostList", costKeys.map(model =>
+                `<div class="pg-breakdown-row">
+                    <span class="pg-breakdown-label">${escHtml(model)}</span>
+                    <span class="pg-breakdown-value">$${costs[model].toFixed(4)}</span>
+                </div>`
+            ).join(""));
+        } else {
+            setHTML("lfCostList", `
+                <div class="pg-empty">
+                    <div class="pg-empty-icon">💰</div>
+                    No cost data yet
+                </div>
+            `);
+        }
+
+        // Tool call heatmap
+        const tools = d.tool_calls || {};
+        const toolKeys = Object.keys(tools);
+        if (toolKeys.length > 0) {
+            const maxCount = Math.max(...Object.values(tools));
+            setHTML("lfToolHeatmap", `<div class="pg-heatmap-grid">${
+                toolKeys.map(name => {
+                    const count = tools[name];
+                    const intensity = maxCount > 0 ? count / maxCount : 0;
+                    const alpha = 0.15 + (intensity * 0.85);
+                    return `<div class="pg-heatmap-cell" style="background:rgba(79,195,247,${alpha.toFixed(2)})" title="${escHtml(name)}: ${count}">
+                        <span class="pg-heatmap-name">${escHtml(name)}</span>
+                        <span class="pg-heatmap-count">${fmt(count)}</span>
+                    </div>`;
+                }).join("")
+            }</div>`);
+        } else {
+            setHTML("lfToolHeatmap", `
+                <div class="pg-empty">
+                    <div class="pg-empty-icon">🔧</div>
+                    No tool calls yet
+                </div>
+            `);
+        }
+
+        // Dashboard link
+        const link = document.getElementById("lfDashboardLink");
+        if (link && d.host) {
+            link.href = d.host;
+        }
+
+    } catch (e) {
+        console.error("Failed to fetch LangFuse analytics:", e);
+        if (section) section.style.display = "none";
+    }
+}
+
+
 // ── HTML Escaping ─────────────────────────────────────────
 function escHtml(str) {
     if (!str) return "";
@@ -226,10 +314,11 @@ function escHtml(str) {
 
 // ── Refresh Loop ──────────────────────────────────────────
 async function refresh() {
-    await Promise.all([fetchSystem(), fetchGuardrails()]);
+    await Promise.all([fetchSystem(), fetchGuardrails(), fetchLangfuse()]);
     lastRefresh = new Date();
     updateRefreshIndicator();
 }
+
 
 function updateRefreshIndicator() {
     const el = document.getElementById("refreshIndicator");

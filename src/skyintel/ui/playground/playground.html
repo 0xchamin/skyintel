@@ -244,6 +244,97 @@
 
         </div>
     </section>
+        <!-- ══════════════════════════════════════ -->
+    <!-- LANGFUSE ANALYTICS                     -->
+    <!-- ══════════════════════════════════════ -->
+    <section id="langfuseSection" class="pg-section" style="display:none">
+        <div class="pg-section-title">LangFuse Analytics <span class="pg-section-badge">Last 30 days</span></div>
+        <div class="pg-grid">
+
+            <!-- Total Traces -->
+            <div class="pg-card">
+                <div class="pg-card-header">
+                    <span class="pg-card-title">Chat Sessions</span>
+                    <span class="pg-card-icon">💬</span>
+                </div>
+                <div id="lfTraces" class="pg-metric-value accent">--</div>
+                <div class="pg-metric-sub">total traces</div>
+            </div>
+
+            <!-- Avg Latency -->
+            <div class="pg-card">
+                <div class="pg-card-header">
+                    <span class="pg-card-title">Avg Latency</span>
+                    <span class="pg-card-icon">⚡</span>
+                </div>
+                <div id="lfLatency" class="pg-metric-value yellow">--</div>
+                <div class="pg-metric-sub">per chat</div>
+            </div>
+
+            <!-- Tokens -->
+            <div class="pg-card">
+                <div class="pg-card-header">
+                    <span class="pg-card-title">Token Usage</span>
+                    <span class="pg-card-icon">🔤</span>
+                </div>
+                <div id="lfTokensTotal" class="pg-metric-value green">--</div>
+                <div class="pg-metric-sub">total tokens</div>
+                <div class="pg-breakdown" style="margin-top:16px">
+                    <div class="pg-breakdown-row">
+                        <span class="pg-breakdown-label">Input</span>
+                        <span id="lfTokensInput" class="pg-breakdown-value">--</span>
+                    </div>
+                    <div class="pg-breakdown-row">
+                        <span class="pg-breakdown-label">Output</span>
+                        <span id="lfTokensOutput" class="pg-breakdown-value">--</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cost by Model -->
+            <div class="pg-card">
+                <div class="pg-card-header">
+                    <span class="pg-card-title">Cost by Model</span>
+                    <span class="pg-card-icon">💰</span>
+                </div>
+                <div id="lfCostList" class="pg-breakdown">
+                    <div class="pg-empty">
+                        <div class="pg-empty-icon">💰</div>
+                        No cost data yet
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tool Call Heatmap (wide) -->
+            <div class="pg-card pg-card-wide">
+                <div class="pg-card-header">
+                    <span class="pg-card-title">Tool Call Frequency</span>
+                    <span class="pg-card-icon">🔧</span>
+                </div>
+                <div id="lfToolHeatmap" class="pg-heatmap">
+                    <div class="pg-empty">
+                        <div class="pg-empty-icon">🔧</div>
+                        No tool calls yet
+                    </div>
+                </div>
+            </div>
+
+            <!-- Open LangFuse -->
+            <div class="pg-card">
+                <div class="pg-card-header">
+                    <span class="pg-card-title">LangFuse Dashboard</span>
+                    <span class="pg-card-icon">📊</span>
+                </div>
+                <div style="text-align:center; padding:16px 0">
+                    <a id="lfDashboardLink" href="#" target="_blank" class="pg-langfuse-link">
+                        Open LangFuse Dashboard ↗
+                    </a>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
 
 </main>
 

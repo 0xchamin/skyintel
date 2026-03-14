@@ -338,3 +338,72 @@ html, body {
     .pg-header { padding: 12px 16px; }
     .pg-metric-value { font-size: 24px; }
 }
+
+
+/* ── Section Badge ──────────────────────── */
+.pg-section-badge {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-muted);
+    background: rgba(255, 255, 255, 0.05);
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-left: 8px;
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+/* ── LangFuse Link ──────────────────────── */
+.pg-langfuse-link {
+    display: inline-block;
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    padding: 10px 20px;
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    transition: background 0.2s, color 0.2s;
+}
+
+.pg-langfuse-link:hover {
+    background: var(--accent);
+    color: var(--bg-primary);
+}
+
+/* ── Heatmap Grid ───────────────────────── */
+.pg-heatmap-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 8px;
+}
+
+.pg-heatmap-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 8px;
+    border-radius: 8px;
+    text-align: center;
+    transition: transform 0.15s;
+}
+
+.pg-heatmap-cell:hover {
+    transform: scale(1.05);
+}
+
+.pg-heatmap-name {
+    font-size: 11px;
+    color: var(--text-primary);
+    font-weight: 500;
+    word-break: break-all;
+    margin-bottom: 4px;
+}
+
+.pg-heatmap-count {
+    font-size: 18px;
+    font-weight: 700;
+    font-family: var(--mono);
+    color: var(--text-primary);
+}

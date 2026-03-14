@@ -349,6 +349,12 @@ async def playground_guardrails(request):
         return JSONResponse({"error": "Playground disabled"}, status_code=403)
     return JSONResponse(await service.get_playground_guardrails())
 
+async def playground_langfuse(request):
+    settings = get_settings()
+    if not settings.playground_enabled:
+        return JSONResponse({"error": "Playground disabled"}, status_code=403)
+    return JSONResponse(await service.get_playground_langfuse())
+
 # ── Lifecycle ────────────────────────────────────────────────
 async def on_startup():
     logger.info("Open Sky Intelligence starting on %s:%d", settings.host, settings.port)
@@ -397,6 +403,8 @@ app = Starlette(
         Route("/playground", endpoint=playground_page),
         Route("/api/playground/system", endpoint=playground_system),
         Route("/api/playground/guardrails", endpoint=playground_guardrails),
+        Route("/api/playground/langfuse", endpoint=playground_langfuse),
+
     ],
     lifespan=lifespan,
 )

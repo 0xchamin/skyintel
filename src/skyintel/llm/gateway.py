@@ -18,6 +18,12 @@ PROVIDER_PREFIX = {
 
 MAX_RESULT_ITEMS = 500
 
+# ── Tool call tracking (for /playground) ──
+_tool_call_counts = {}
+
+def get_tool_call_counts() -> dict:
+    return dict(_tool_call_counts)
+
 TOOLS = [
     {
         "type": "function",
@@ -178,7 +184,6 @@ TOOLS = [
             },
         },
     },
-
 ]
 
 # Map tool names to service functions
@@ -195,7 +200,6 @@ TOOL_HANDLERS = {
     "iss_position": service.iss_position,
     "iss_crew": service.iss_crew,
     "iss_passes": service.iss_passes,
-
 }
 
 def _configure_langfuse():
@@ -213,15 +217,13 @@ def _configure_langfuse():
 _configure_langfuse()
 
 
-
 SYSTEM_PROMPT = """You are an expert aviation and space intelligence analyst powered by Open Sky Intelligence.
 
 You have access to real-time tools for flight tracking, military aircraft monitoring, satellite positions,
 aircraft metadata, and weather. Use aviation terminology accurately.
 
 When generating reports, use well-structured HTML with inline CSS (dark theme).
-Always note timestamps — this is live data. Prioritise military flights in listings.
-Convert place names to coordinates yourself — you know world geography."""
+Always note timestamps — this is live data. Prioritise military flights in listings."""
 
 SYSTEM_PROMPT_CLI = SYSTEM_PROMPT.replace(
     "When generating reports, use well-structured HTML with inline CSS (dark theme).",
@@ -310,7 +312,6 @@ async def chat(
                 else:
                     raise
 
-
         choice = response.choices[0]
 
         if choice.finish_reason == "tool_calls" or (choice.message.tool_calls and len(choice.message.tool_calls) > 0):
@@ -319,6 +320,7 @@ async def chat(
             for tc in choice.message.tool_calls:
                 args = json.loads(tc.function.arguments) if isinstance(tc.function.arguments, str) else tc.function.arguments
                 logger.info("Tool call: %s(%s)", tc.function.name, args)
+                _tool_call_counts[tc.function.name] = _tool_call_counts.get(tc.function.name, 0) + 1
                 result = await execute_tool(tc.function.name, args)
                 full_messages.append({
                     "role": "tool",

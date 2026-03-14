@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     # LangFuse
     langfuse_public_key: str | None = None
     langfuse_secret_key: str | None = None
-    #langfuse_host: str = "https://cloud.langfuse.com"
+    langfuse_host: str = "https://cloud.langfuse.com"
     langfuse_otel_host: str = "https://cloud.langfuse.com"
 
     # Playground
