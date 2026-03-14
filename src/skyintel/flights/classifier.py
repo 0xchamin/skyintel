@@ -22,6 +22,26 @@ MILITARY_HEX_RANGES = [
     ("300000", "33ffff"),  # Italy military (partial)
 ]
 
+PRIVATE_JET_TYPES = {
+    # Gulfstream
+    "GLF2", "GLF3", "GLF4", "GLF5", "GLF6", "GALX", "G150", "G200", "G280", "GL7T",
+    # Bombardier
+    "CL30", "CL35", "CL60", "GL5T", "GLEX", "BD70",
+    # Cessna Citation
+    "C500", "C510", "C525", "C550", "C560", "C56X", "C650", "C680", "C700", "C750",
+    # Dassault Falcon
+    "FA50", "FA7X", "FA8X", "F900", "F2TH",
+    # Embraer
+    "E35L", "E50P", "E55P", "E545",
+    # Learjet
+    "LJ35", "LJ40", "LJ45", "LJ60", "LJ75",
+    # Hawker / Beechcraft
+    "H25B", "HA4T", "BE40", "PRM1",
+    # Pilatus
+    "PC12", "PC24",
+}
+
+
 # Squawk codes associated with military
 MILITARY_SQUAWKS = {"7501", "7502", "7503", "7504", "7505", "0021", "0022", "0023"}
 
@@ -62,5 +82,9 @@ def classify(flight) -> str:
     # Squawk code
     if flight.squawk and flight.squawk in MILITARY_SQUAWKS:
         return "military"
+    
+    if flight.model and flight.model.upper() in PRIVATE_JET_TYPES:
+        return "private"
+
 
     return flight.aircraft_type
