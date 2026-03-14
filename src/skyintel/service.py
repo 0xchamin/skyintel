@@ -17,6 +17,22 @@ from skyintel.iss.open_notify import OpenNotifyClient
 from skyintel.iss.passes import predict_passes
 from skyintel.satellites.repository import get_satellites_by_category
 
+# ── Playground runtime stats (updated by server.py poll loops) ──
+playground_runtime = {
+    "start_time": None,
+    "poll_count": 0,
+    "last_flight_poll": None,
+    "last_sat_poll": None,
+    "flights_commercial": 0,
+    "flights_military": 0,
+    "flights_private": 0,
+    "source_health": {
+        "adsb_lol":   {"healthy": False, "last_success": None, "error": None},
+        "celestrak":  {"healthy": False, "last_success": None, "error": None},
+        "hexdb":      {"healthy": True,  "last_success": None, "error": None},
+        "open_meteo": {"healthy": True,  "last_success": None, "error": None},
+    },
+}
 
 logger = logging.getLogger(__name__)
 
@@ -156,6 +172,68 @@ async def get_status() -> dict:
         "last_poll_military": _last_poll_military,
         "satellites_cached": _satellite_count,
     }
+
+async def get_playground_system() -> dict:
+    """System metrics for playground dashboard."""
+    import os, time
+
+    settings = get_settings()
+    db = await get_db(settings.db_path)
+
+    rt = playground_runtime
+    flights_commercial = rt["flights_commercial"]
+    flights_military = rt["flights_military"]
+    flights_private = rt["flights_private"]
+
+    sat_row = await db.execute("SELECT COUNT(*) as total, COUNT(DISTINCT category) as cats FROM satellites")
+    sat_counts = await sat_row.fetchone()
+
+    db_size = None
+    try:
+        db_size = os.path.getsize(settings.db_path)
+    except OSError:
+        pass
+
+    uptime = time.time() - rt["start_time"] if rt["start_time"] else None
+
+    return {
+        "flights_commercial": flights_commercial,
+        "flights_military": flights_military,
+        "flights_private": flights_private,
+        "satellites_cached": sat_counts["total"] if sat_counts else 0,
+        "satellite_categories": sat_counts["cats"] if sat_counts else 0,
+        "poll_count": rt["poll_count"],
+        "uptime_seconds": round(uptime, 1) if uptime else None,
+        "last_flight_poll": rt["last_flight_poll"],
+        "last_sat_poll": rt["last_sat_poll"],
+        "flight_poll_interval": settings.flight_poll_interval,
+        "satellite_poll_interval": settings.satellite_poll_interval,
+        "db_size_bytes": db_size,
+        "db_path": str(settings.db_path),
+        "sources": rt["source_health"],
+        "llm_provider": settings.llm_provider,
+        "llm_model": settings.llm_model,
+        "llm_api_key_set": bool(settings.llm_api_key),
+        "langfuse_configured": bool(settings.langfuse_public_key and settings.langfuse_secret_key),
+    }
+
+
+async def get_playground_guardrails() -> dict:
+    """Guardrail stats for playground dashboard."""
+    try:
+        from skyintel.llm.guardrails import get_guardrail_stats
+        stats = get_guardrail_stats()
+        return {**stats, "available": True}
+    except ImportError:
+        return {
+            "available": False,
+            "input_scans": 0,
+            "output_scans": 0,
+            "blocked_count": 0,
+            "blocked_by_scanner": {},
+            "scanners": [],
+            "recent_blocks": [],
+        }
 
 async def cleanup():
     """Close all HTTP clients."""

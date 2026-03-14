@@ -232,3 +232,27 @@ async def iss_passes(lat: float, lon: float, hours: int = 24, min_elevation: flo
         min_elevation: Minimum peak elevation in degrees to include (default 10)
     """
     return await service.iss_passes(lat, lon, hours, min_elevation)
+
+@mcp.tool()
+async def playground_system() -> dict:
+    """Get system health and operational metrics for the SkyIntel instance.
+
+    Returns flight counts (commercial/military/private), satellite cache stats,
+    poll cycle count, uptime, database size, data source health status,
+    LLM configuration, and LangFuse observability status.
+    """
+    return await service.get_playground_system()
+
+
+@mcp.tool()
+async def playground_guardrails() -> dict:
+    """Get guardrail monitoring stats for the SkyIntel instance.
+
+    Returns scan counts (input/output), blocked query count and block rate,
+    scanner load status (loaded/lazy/unavailable), blocked counts per scanner,
+    and the 20 most recent blocked queries (anonymised).
+
+    Returns available=false on branches without LLM Guard installed.
+    """
+    return await service.get_playground_guardrails()
+

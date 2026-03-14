@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     #langfuse_host: str = "https://cloud.langfuse.com"
     langfuse_otel_host: str = "https://cloud.langfuse.com"
 
+    # Playground
+    playground_enabled: bool = True
+
     @property
     def llm_configured(self) -> bool:
         return all([self.llm_provider, self.llm_api_key, self.llm_model])

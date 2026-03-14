@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SkyIntel — Playground</title> 
+    <link rel="stylesheet" href="/playground/playground.css">
+
+</head>
+<body>
+
+<!-- ── Header ─────────────────────────────── -->
+<header class="pg-header">
+    <div>
+        <h1>🔭 SkyIntel Playground</h1>
+        <span class="subtitle">System Health &amp; Guardrails Monitor</span>
+    </div>
+    <div class="pg-header-right">
+        <span id="refreshIndicator" class="pg-refresh-indicator">--</span>
+        <a href="/" class="pg-back-link">← Back to Globe</a>
+    </div>
+</header>
+
+<main class="pg-container">
+
+    <!-- ══════════════════════════════════════ -->
+    <!-- SYSTEM METRICS                         -->
+    <!-- ══════════════════════════════════════ -->
+    <section class="pg-section">
+        <div class="pg-section-title">System Metrics</div>
+        <div class="pg-grid">
+
+            <!-- Flights Tracked -->
+            <div class="pg-card">
+                <div class="pg-card-header">
+                    <span class="pg-card-title">Flights Tracked</span>
+                    <span class="pg-card-icon">✈️</span>
+                </div>
+                <div id="flightsTotal" class="pg-metric-value accent">--</div>
+                <div id="flightsSub" class="pg-metric-sub">loading…</div>
+                <div class="pg-breakdown">
+                    <div class="pg-breakdown-row">
+                        <span class="pg-breakdown-label">
+                            <span class="pg-breakdown-dot commercial"></span> Commercial
+                        </span>
+                        <span id="flightsCommercial" class="pg-breakdown-value">--</span>
+                    </div>
+                    <div class="pg-breakdown-row">
+                        <span class="pg-breakdown-label">
+                            <span class="pg-breakdown-dot military"></span> Military
+                        </span>
+                        <span id="flightsMilitary" class="pg-breakdown-value">--</span>
+                    </div>
+                    <div class="pg-breakdown-row">
+                        <span class="pg-breakdown-label">
+                            <span class="pg-breakdown-dot private"></span> Private
+                        </span>
+                        <span id="flightsPrivate" class="pg-breakdown-value">--</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Satellites Cached -->
+            <div class="pg-card">
+                <div class="pg-card-header">
+                    <span class="pg-card-title">Satellites Cached</span>
+                    <span class="pg-card-icon">🛰️</span>
+                </div>
+                <div id="satellitesTotal" class="pg-metric-value green">--</div>
+                <div id="satellitesSub" class="pg-metric-sub">loading…</div>
+            </div>
+
+            <!-- Polling & Uptime -->
+            <div class="pg-card">
+                <div class="pg-card-header">
+                    <span class="pg-card-title">Polling &amp; Uptime</span>
+                    <span class="pg-card-icon">🔄</span>
+                </div>
+                <div id="pollCount" class="pg-metric-value yellow">--</div>
+                <div class="pg-metric-sub">poll cycles</div>
+                <div class="pg-breakdown" style="margin-top:16px">
+                    <div class="pg-breakdown-row">
+                        <span class="pg-breakdown-label">Uptime</span>
+                        <span id="uptime" class="pg-breakdown-value">--</span>
+                    </div>
+                    <div class="pg-breakdown-row">
+                        <span class="pg-breakdown-label">Flight interval</span>
+                        <span id="flightInterval" class="pg-breakdown-value">--</span>
+                    </div>
+                    <div class="pg-breakdown-row">
+                        <span class="pg-breakdown-label">Satellite interval</span>
+                        <span id="satInterval" class="pg-breakdown-value">--</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Database -->
+            <div class="pg-card">
+                <div class="pg-card-header">
+                    <span class="pg-card-title">Database</span>
+                    <span class="pg-card-icon">🗄️</span>
+                </div>
+                <div id="dbSize" class="pg-metric-value orange">--</div>
+                <div class="pg-metric-sub">SQLite (WAL mode)</div>
+                <div class="pg-breakdown" style="margin-top:16px">
+                    <div class="pg-breakdown-row">
+                        <span class="pg-breakdown-label">Retention</span>
+                        <span id="dbRetention" class="pg-breakdown-value">6 h</span>
+                    </div>
+                    <div class="pg-breakdown-row">
+                        <span class="pg-breakdown-label">Path</span>
+                        <span id="dbPath" class="pg-breakdown-value" style="font-size:11px">--</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Data Sources -->
+            <div class="pg-card">
+                <div class="pg-card-header">
+                    <span class="pg-card-title">Data Sources</span>
+                    <span class="pg-card-icon">📡</span>
+                </div>
+                <div class="pg-sources">
+                    <div class="pg-source-row">
+                        <span class="pg-source-name">ADSB.lol</span>
+                        <span id="srcAdsb" class="pg-status down">
+                            <span class="pg-status-dot"></span> checking…
+                        </span>
+                    </div>
+                    <div class="pg-source-row">
+                        <span class="pg-source-name">Celestrak</span>
+                        <span id="srcCelestrak" class="pg-status down">
+                            <span class="pg-status-dot"></span> checking…
+                        </span>
+                    </div>
+                    <div class="pg-source-row">
+                        <span class="pg-source-name">hexdb.io</span>
+                        <span id="srcHexdb" class="pg-status down">
+                            <span class="pg-status-dot"></span> checking…
+                        </span>
+                    </div>
+                    <div class="pg-source-row">
+                        <span class="pg-source-name">Open-Meteo</span>
+                        <span id="srcOpenmeteo" class="pg-status down">
+                            <span class="pg-status-dot"></span> checking…
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- LLM Config -->
+            <div class="pg-card">
+                <div class="pg-card-header">
+                    <span class="pg-card-title">LLM Configuration</span>
+                    <span class="pg-card-icon">🤖</span>
+                </div>
+                <div class="pg-breakdown">
+                    <div class="pg-breakdown-row">
+                        <span class="pg-breakdown-label">Provider</span>
+                        <span id="llmProvider" class="pg-breakdown-value">--</span>
+                    </div>
+                    <div class="pg-breakdown-row">
+                        <span class="pg-breakdown-label">Model</span>
+                        <span id="llmModel" class="pg-breakdown-value">--</span>
+                    </div>
+                    <div class="pg-breakdown-row">
+                        <span class="pg-breakdown-label">API Key</span>
+                        <span id="llmApiKey" class="pg-breakdown-value">--</span>
+                    </div>
+                    <div class="pg-breakdown-row">
+                        <span class="pg-breakdown-label">LangFuse</span>
+                        <span id="llmLangfuse" class="pg-breakdown-value">--</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- ══════════════════════════════════════ -->
+    <!-- GUARDRAILS MONITOR                     -->
+    <!-- ══════════════════════════════════════ -->
+    <section class="pg-section">
+        <div class="pg-section-title">Guardrails Monitor</div>
+        <div class="pg-grid">
+
+            <!-- Scan Count -->
+            <div class="pg-card">
+                <div class="pg-card-header">
+                    <span class="pg-card-title">Total Scans</span>
+                    <span class="pg-card-icon">🔍</span>
+                </div>
+                <div id="guardsTotal" class="pg-metric-value accent">--</div>
+                <div class="pg-metric-sub">scans performed</div>
+                <div class="pg-breakdown" style="margin-top:16px">
+                    <div class="pg-breakdown-row">
+                        <span class="pg-breakdown-label">Input scans</span>
+                        <span id="guardsInput" class="pg-breakdown-value">--</span>
+                    </div>
+                    <div class="pg-breakdown-row">
+                        <span class="pg-breakdown-label">Output scans</span>
+                        <span id="guardsOutput" class="pg-breakdown-value">--</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Blocked -->
+            <div class="pg-card">
+                <div class="pg-card-header">
+                    <span class="pg-card-title">Blocked</span>
+                    <span class="pg-card-icon">🛡️</span>
+                </div>
+                <div id="guardsBlocked" class="pg-metric-value red">--</div>
+                <div id="guardsBlockRate" class="pg-metric-sub">-- block rate</div>
+                <div id="guardsByScanner" class="pg-breakdown" style="margin-top:16px">
+                    <!-- populated by JS -->
+                </div>
+            </div>
+
+            <!-- Scanner Status -->
+            <div class="pg-card">
+                <div class="pg-card-header">
+                    <span class="pg-card-title">Scanner Status</span>
+                    <span class="pg-card-icon">⚙️</span>
+                </div>
+                <div id="scannerList" class="pg-guard-scanners">
+                    <!-- populated by JS -->
+                </div>
+            </div>
+
+            <!-- Recent Blocks (wide card) -->
+            <div class="pg-card pg-card-wide">
+                <div class="pg-card-header">
+                    <span class="pg-card-title">Recent Blocked Queries</span>
+                    <span class="pg-card-icon">🚫</span>
+                </div>
+                <div id="recentBlocks" class="pg-blocks-list">
+                    <div class="pg-empty">
+                        <div class="pg-empty-icon">🛡️</div>
+                        No blocked queries yet
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+</main>
+
+<script src="/playground/playground.js"></script>
+</body>
+</html>
