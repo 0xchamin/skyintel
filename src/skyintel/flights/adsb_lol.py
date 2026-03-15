@@ -1,6 +1,11 @@
 import httpx
 import logging
+import asyncio
+
 from skyintel.models import NormalizedFlight
+from skyintel.flights.hubs import HUBS
+from skyintel.config import get_settings
+
 
 logger = logging.getLogger(__name__)
 
@@ -12,6 +17,7 @@ FT_TO_M = 0.3048
 KT_TO_MS = 0.514444
 FTMIN_TO_MS = 0.00508
 
+#radius_m = int(get_settings().hub_radius_nm / 0.000539957)
 
 def _normalize(ac: dict, force_military: bool = False) -> NormalizedFlight | None:
     """Convert an ADSB.lol aircraft dict to NormalizedFlight."""
@@ -91,8 +97,11 @@ class AdsbLolClient:
     
     async def get_nearby(self, lat: float, lon: float, radius_m: int = 99999) -> list[NormalizedFlight]:
         """Fetch flights within radius of a point (max 99999m)."""
-        radius_m = min(radius_m, 99999)
-        url = f"https://api.adsb.lol/v2/point/{lat}/{lon}/{radius_m}"
+        #radius_m = min(radius_m, 99999)
+        #url = f"https://api.adsb.lol/v2/point/{lat}/{lon}/{radius_m}"
+        radius_nm = int(radius_m * 0.000539957)
+        url = f"https://api.adsb.lol/v2/point/{lat}/{lon}/{radius_nm}"
+        
         resp = await self._http.get(url)
         resp.raise_for_status()
         flights = [f for ac in resp.json().get("ac", []) if (f := _normalize(ac))]
@@ -107,6 +116,52 @@ class AdsbLolClient:
         flights = [f for ac in resp.json().get("ac", []) if (f := _normalize(ac))]
         logger.info("ADSB.lol callsign %s: %d flights", callsign, len(flights))
         return flights
+    
+    async def poll_hubs(self) -> list[NormalizedFlight]:
+        """Poll global flight data via single ADSB.lol point query."""
+        url = "https://api.adsb.lol/v2/point/0/0/99999"
+        try:
+            resp = await self._http.get(url)
+            resp.raise_for_status()
+            flights = [f for ac in resp.json().get("ac", []) if (f := _normalize(ac))]
+            logger.info("Global poll: %d flights", len(flights))
+            return flights
+        except Exception as e:
+            logger.error("Global poll failed: %s", e)
+            return []
+
+    
+    # async def poll_hubs(self) -> list[NormalizedFlight]:
+    #     """Poll all regional hubs in parallel, deduplicate by icao24."""
+    #     from skyintel.flights.hubs import HUBS
+
+    #     #tasks = [self.get_nearby(lat, lon, 99999) for _, _, lat, lon in HUBS]
+    #     #tasks = [self.get_nearby(lat, lon, radius_m) for _, _, lat, lon in HUBS]
+
+    #     settings = get_settings()
+    #     radius_m = int(settings.hub_radius_nm / 0.000539957)
+    #     tasks = [self.get_nearby(lat, lon, radius_m) for _, _, lat, lon in HUBS]
+
+
+    #     results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    #     seen: dict[str, NormalizedFlight] = {}
+    #     success = 0
+    #     for i, result in enumerate(results):
+    #         if isinstance(result, Exception):
+    #             logger.warning("Hub %s poll failed: %s", HUBS[i][0], result)
+    #             continue
+    #         success += 1
+    #         for flight in result:
+    #             if flight.icao24 not in seen:
+    #                 seen[flight.icao24] = flight
+
+    #     logger.info(
+    #         "Regional poll: %d unique flights from %d/%d hubs",
+    #         len(seen), success, len(HUBS),
+    #     )
+    #     return list(seen.values())
+
 
     async def get_by_hex(self, icao24: str) -> list[NormalizedFlight]:
         """Fetch flight by ICAO24 hex code."""

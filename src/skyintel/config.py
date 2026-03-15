@@ -18,13 +18,11 @@ class Settings(BaseSettings):
     #db_path: Path = Path.home() / ".osai" / "osai.db"
     db_path: Path = Path.home() / ".skyintel" / "skyintel.db"
 
-
-    # OpenSky Network (OAuth2)
-    opensky_client_id: str | None = None
-    opensky_client_secret: str | None = None
-
+    # hub
+    hub_radius_nm: int = 150
+    
     # Poll intervals (seconds)
-    flight_poll_interval: int = 30
+    flight_poll_interval: int = 60
     satellite_poll_interval: int = 3600
 
     # LLM (web UI chat only)
@@ -38,15 +36,11 @@ class Settings(BaseSettings):
     # LangFuse
     langfuse_public_key: str | None = None
     langfuse_secret_key: str | None = None
-    #langfuse_host: str = "https://cloud.langfuse.com"
+    langfuse_host: str = "https://cloud.langfuse.com"
     langfuse_otel_host: str = "https://cloud.langfuse.com"
 
-
-
-
-    @property
-    def opensky_configured(self) -> bool:
-        return self.opensky_client_id is not None and self.opensky_client_secret is not None
+    # Playground
+    playground_enabled: bool = True
 
     @property
     def llm_configured(self) -> bool:

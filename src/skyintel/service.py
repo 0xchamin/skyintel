@@ -17,6 +17,22 @@ from skyintel.iss.open_notify import OpenNotifyClient
 from skyintel.iss.passes import predict_passes
 from skyintel.satellites.repository import get_satellites_by_category
 
+# ── Playground runtime stats (updated by server.py poll loops) ──
+playground_runtime = {
+    "start_time": None,
+    "poll_count": 0,
+    "last_flight_poll": None,
+    "last_sat_poll": None,
+    "flights_commercial": 0,
+    "flights_military": 0,
+    "flights_private": 0,
+    "source_health": {
+        "adsb_lol":   {"healthy": False, "last_success": None, "error": None},
+        "celestrak":  {"healthy": False, "last_success": None, "error": None},
+        "hexdb":      {"healthy": True,  "last_success": None, "error": None},
+        "open_meteo": {"healthy": True,  "last_success": None, "error": None},
+    },
+}
 
 logger = logging.getLogger(__name__)
 
@@ -156,6 +172,250 @@ async def get_status() -> dict:
         "last_poll_military": _last_poll_military,
         "satellites_cached": _satellite_count,
     }
+
+async def get_playground_system() -> dict:
+    """System metrics for playground dashboard."""
+    import os, time
+
+    settings = get_settings()
+    db = await get_db(settings.db_path)
+
+    rt = playground_runtime
+    flights_commercial = rt["flights_commercial"]
+    flights_military = rt["flights_military"]
+    flights_private = rt["flights_private"]
+
+    sat_row = await db.execute("SELECT COUNT(*) as total, COUNT(DISTINCT category) as cats FROM satellites")
+    sat_counts = await sat_row.fetchone()
+
+    db_size = None
+    try:
+        db_size = os.path.getsize(settings.db_path)
+    except OSError:
+        pass
+
+    uptime = time.time() - rt["start_time"] if rt["start_time"] else None
+
+    return {
+        "flights_commercial": flights_commercial,
+        "flights_military": flights_military,
+        "flights_private": flights_private,
+        "satellites_cached": sat_counts["total"] if sat_counts else 0,
+        "satellite_categories": sat_counts["cats"] if sat_counts else 0,
+        "poll_count": rt["poll_count"],
+        "uptime_seconds": round(uptime, 1) if uptime else None,
+        "last_flight_poll": rt["last_flight_poll"],
+        "last_sat_poll": rt["last_sat_poll"],
+        "flight_poll_interval": settings.flight_poll_interval,
+        "satellite_poll_interval": settings.satellite_poll_interval,
+        "db_size_bytes": db_size,
+        "db_path": str(settings.db_path),
+        "sources": rt["source_health"],
+        "llm_provider": settings.llm_provider,
+        "llm_model": settings.llm_model,
+        "llm_api_key_set": bool(settings.llm_api_key),
+        "langfuse_configured": bool(settings.langfuse_public_key and settings.langfuse_secret_key),
+    }
+
+
+async def get_playground_guardrails() -> dict:
+    """Guardrail stats for playground dashboard."""
+    try:
+        from skyintel.llm.guardrails import get_guardrail_stats
+        stats = get_guardrail_stats()
+        return {**stats, "available": True}
+    except ImportError:
+        return {
+            "available": False,
+            "input_scans": 0,
+            "output_scans": 0,
+            "blocked_count": 0,
+            "blocked_by_scanner": {},
+            "scanners": [],
+            "recent_blocks": [],
+        }
+
+async def get_playground_langfuse() -> dict:
+    """LangFuse analytics for playground dashboard."""
+    import json
+    import httpx
+    from base64 import b64encode
+    from datetime import datetime, timezone, timedelta
+    from skyintel.llm.gateway import get_tool_call_counts as _get_tool_call_counts
+
+
+    settings = get_settings()
+
+    if not settings.langfuse_public_key or not settings.langfuse_secret_key:
+        return {"available": False, "reason": "LangFuse keys not configured"}
+
+    host = settings.langfuse_host.rstrip("/")
+    auth_str = f"{settings.langfuse_public_key}:{settings.langfuse_secret_key}"
+    auth_header = f"Basic {b64encode(auth_str.encode()).decode()}"
+    headers = {"Authorization": auth_header}
+
+    now = datetime.now(timezone.utc)
+    from_ts = (now - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    to_ts = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    result = {
+        "available": True,
+        "host": host,
+        "total_traces": 0,
+        "avg_latency_ms": None,
+        "total_tokens": {"input": 0, "output": 0, "total": 0},
+        "cost_by_model": {},
+        "tool_calls": {},
+        "tool_calls": _get_tool_call_counts(),
+
+        "error_count": 0,
+        "daily_metrics": [],
+    }
+
+    async with httpx.AsyncClient(timeout=15.0) as client:
+
+        # ── 1. Total traces (v1 traces API returns meta.totalItems) ──
+        try:
+            resp = await client.get(
+                f"{host}/api/public/traces",
+                params={"limit": 1},
+                headers=headers,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                result["total_traces"] = data.get("meta", {}).get("totalItems", 0)
+        except Exception as e:
+            logger.warning("LangFuse traces fetch failed: %s", e)
+
+        # ── 2. Average latency (v2 metrics — observations view) ──
+        try:
+            query = json.dumps({
+                "view": "observations",
+                "metrics": [{"measure": "latency", "aggregation": "avg"}],
+                "dimensions": [],
+                "filters": [],
+                "fromTimestamp": from_ts,
+                "toTimestamp": to_ts,
+            })
+            resp = await client.get(
+                f"{host}/api/public/v2/metrics",
+                params={"query": query},
+                headers=headers,
+            )
+            if resp.status_code == 200:
+                rows = resp.json().get("data", [])
+                if rows:
+                    val = rows[0].get("latency_avg")
+                    if val is not None:
+                        result["avg_latency_ms"] = round(float(val), 1)
+        except Exception as e:
+            logger.warning("LangFuse latency fetch failed: %s", e)
+
+        # ── 3. Total tokens (v2 metrics) ──
+        try:
+            query = json.dumps({
+                "view": "observations",
+                "metrics": [
+                    {"measure": "inputTokens", "aggregation": "sum"},
+                    {"measure": "outputTokens", "aggregation": "sum"},
+                    {"measure": "totalTokens", "aggregation": "sum"},
+                ],
+                "dimensions": [],
+                "filters": [],
+                "fromTimestamp": from_ts,
+                "toTimestamp": to_ts,
+            })
+            resp = await client.get(
+                f"{host}/api/public/v2/metrics",
+                params={"query": query},
+                headers=headers,
+            )
+            if resp.status_code == 200:
+                rows = resp.json().get("data", [])
+                if rows:
+                    row = rows[0]
+                    result["total_tokens"] = {
+                        "input": int(row.get("inputTokens_sum", 0) or 0),
+                        "output": int(row.get("outputTokens_sum", 0) or 0),
+                        "total": int(row.get("totalTokens_sum", 0) or 0),
+                    }
+        except Exception as e:
+            logger.warning("LangFuse tokens fetch failed: %s", e)
+
+        # ── 4. Cost by model (v2 metrics) ──
+        try:
+            query = json.dumps({
+                "view": "observations",
+                "metrics": [{"measure": "totalCost", "aggregation": "sum"}],
+                "dimensions": [{"field": "providedModelName"}],
+                "filters": [],
+                "fromTimestamp": from_ts,
+                "toTimestamp": to_ts,
+                "orderBy": [{"field": "totalCost_sum", "direction": "desc"}],
+            })
+            resp = await client.get(
+                f"{host}/api/public/v2/metrics",
+                params={"query": query},
+                headers=headers,
+            )
+            if resp.status_code == 200:
+                cost_by_model = {}
+                for row in resp.json().get("data", []):
+                    model = row.get("providedModelName", "unknown")
+                    cost = float(row.get("totalCost_sum", 0) or 0)
+                    if model and cost > 0:
+                        cost_by_model[model] = round(cost, 6)
+                result["cost_by_model"] = cost_by_model
+        except Exception as e:
+            logger.warning("LangFuse cost fetch failed: %s", e)
+
+        # ── 5. Tool call frequency (v2 metrics — count by observation name) ──
+                # ── 5. Tool call frequency (from in-memory gateway tracking) ──
+        try:
+            from skyintel.llm.gateway import get_tool_call_counts
+            result["tool_calls"] = get_tool_call_counts()
+        except ImportError:
+            pass
+
+        # try:
+        #     query = json.dumps({
+        #         "view": "observations",
+        #         "metrics": [{"measure": "count", "aggregation": "count"}],
+        #         "dimensions": [{"field": "name"}],
+        #         "filters": [],
+        #         "fromTimestamp": from_ts,
+        #         "toTimestamp": to_ts,
+        #         "orderBy": [{"field": "count_count", "direction": "desc"}],
+        #     })
+        #     resp = await client.get(
+        #         f"{host}/api/public/v2/metrics",
+        #         params={"query": query},
+        #         headers=headers,
+        #     )
+        #     if resp.status_code == 200:
+        #         tool_calls = {}
+        #         for row in resp.json().get("data", []):
+        #             name = row.get("name", "unknown")
+        #             count = int(row.get("count_count", 0) or 0)
+        #             if name and count > 0:
+        #                 tool_calls[name] = count
+        #         result["tool_calls"] = tool_calls
+        # except Exception as e:
+        #     logger.warning("LangFuse tool calls fetch failed: %s", e)
+
+        # ── 6. Daily metrics (v1 daily endpoint) ──
+        try:
+            resp = await client.get(
+                f"{host}/api/public/metrics/daily",
+                params={"limit": 30},
+                headers=headers,
+            )
+            if resp.status_code == 200:
+                result["daily_metrics"] = resp.json().get("data", [])[:30]
+        except Exception as e:
+            logger.warning("LangFuse daily metrics fetch failed: %s", e)
+
+    return result
 
 async def cleanup():
     """Close all HTTP clients."""

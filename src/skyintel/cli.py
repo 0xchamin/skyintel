@@ -9,6 +9,15 @@ app = typer.Typer(
 )
 console = Console()
 
+def version_callback(value: bool):
+    if value:
+        from importlib.metadata import version
+        console.print(f"skyintel {version('skyintel')}")
+        raise typer.Exit()
+
+@app.callback()
+def main(version: bool = typer.Option(False, "--version", "-v", callback=version_callback, is_eager=True, help="Show version")):
+    pass
 
 @app.command()
 def status():
@@ -25,7 +34,7 @@ def status():
     table.add_row("Port", str(settings.port))
     table.add_row("Database", str(settings.db_path))
     table.add_row("DB exists", "✓" if settings.db_path.exists() else "✗")
-    table.add_row("OpenSky OAuth2", "✓ configured" if settings.opensky_configured else "✗ not set")
+    table.add_row("Data source", "ADSB.lol (global feed)")
     table.add_row("Flight poll", f"{settings.flight_poll_interval}s")
     table.add_row("Satellite poll", f"{settings.satellite_poll_interval}s")
     table.add_row("LLM", f"{settings.llm_provider} / {settings.llm_model}" if settings.llm_configured else "✗ not set")
