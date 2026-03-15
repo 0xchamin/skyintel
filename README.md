@@ -14,7 +14,7 @@
 
 - 🌍 **3D Globe** — CesiumJS-powered immersive dark globe with real-time flight and satellite rendering
 - ✈️ **Flight Tracking** — Live commercial, private, and military aircraft via ADSB.lol global feed (+ optional OpenSky Network for self-hosting)
-- ⚔️ **Military Monitoring** — Unfiltered military aircraft feed — unlike commercial trackers that hide these
+- ⚔️ **Military Monitoring** — Unfiltered military aircraft feed — unlike commercial trackers that hide these (**FOR EDUCATIONAL PURPOSES ONLY**, these are public data)
 - 🛰 **Satellite Tracking** — 6 categories (Space Stations, Military, Weather, Nav, Science, Starlink) via Celestrak + SGP4
 - 🚀 **ISS Tracking** — Real-time position, crew info, pass predictions, and one-click Track ISS
 - 🌤 **Weather** — Current conditions at any location via Open-Meteo
