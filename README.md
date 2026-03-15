@@ -28,6 +28,96 @@
 
 ---
 
+## Quick Start
+
+### Install
+
+```bash
+# Recommended for MCP client integration (Claude Desktop, VS Code, etc.)
+pipx install skyintel
+
+# Or install in a virtual environment
+pip install skyintel
+```
+
+> ⚠️ **`pipx` vs `pip`**: `pipx install` puts the `skyintel` command on your **global PATH** — required for MCP clients like Claude Desktop that spawn the process directly. `pip install` inside a virtual environment only makes the command available when the venv is activated. If you use `pip`, MCP clients will need the **full path** to the binary (e.g. `/path/to/venv/bin/skyintel`).
+
+> ℹ️ `pip install skyintel` installs the `railway` branch version — ADSB.lol only, no OpenSky dependency. For the self-hosted version with OpenSky support, clone the `main` branch directly.
+
+To upgrade an existing installation:
+
+```bash
+pipx upgrade skyintel
+# or
+pip install --upgrade skyintel
+```
+
+### Verify
+
+```bash
+skyintel --version      # Check installed version
+skyintel --help         # View all commands
+skyintel status         # Check configuration and system status
+```
+
+### Run
+
+```bash
+skyintel serve
+```
+
+Open [http://localhost:9096](http://localhost:9096) for the 3D globe and [http://localhost:9096/playground](http://localhost:9096/playground) for the observability dashboard.
+
+### Configuration (optional)
+
+SkyIntel works out of the box with **zero configuration** for basic flight and satellite tracking. API keys are only needed for specific features:
+
+| Feature | Required Keys | Notes |
+|---------|--------------|-------|
+| 3D Globe + flights + satellites | None | Works immediately |
+| Terrain layer | `SKYINTEL_CESIUM_ION_TOKEN` | Free from [cesium.com](https://cesium.com/ion/) |
+| Web AI Chat | None (BYOK in browser) | Set your key in ⚙ Settings in the web UI |
+| CLI `skyintel ask` | `SKYINTEL_LLM_PROVIDER`, `SKYINTEL_LLM_API_KEY`, `SKYINTEL_LLM_MODEL` | Stored in `.env` file |
+| LangFuse observability | `SKYINTEL_LANGFUSE_PUBLIC_KEY`, `SKYINTEL_LANGFUSE_SECRET_KEY` | Free tier at [langfuse.com](https://langfuse.com) |
+| OpenSky Network (`main` branch) | `SKYINTEL_OPENSKY_CLIENT_ID`, `SKYINTEL_OPENSKY_CLIENT_SECRET` | Not needed on `railway` branches |
+
+Create a `.env` file if needed:
+
+```env
+# Server
+SKYINTEL_HOST=0.0.0.0
+SKYINTEL_PORT=9096
+
+# OpenSky Network (main branch only — not needed for railway branches)
+SKYINTEL_OPENSKY_CLIENT_ID=your_client_id
+SKYINTEL_OPENSKY_CLIENT_SECRET=your_client_secret
+
+# Cesium Ion (optional — enables terrain layer)
+SKYINTEL_CESIUM_ION_TOKEN=your_token
+
+# LLM — for CLI 'ask' command (optional, web chat uses browser localStorage)
+SKYINTEL_LLM_PROVIDER=anthropic          # anthropic / openai / google
+SKYINTEL_LLM_API_KEY=sk-ant-...
+SKYINTEL_LLM_MODEL=claude-sonnet-4-20250514
+
+# LangFuse (optional — LLM observability + playground analytics)
+SKYINTEL_LANGFUSE_PUBLIC_KEY=pk-lf-...
+SKYINTEL_LANGFUSE_SECRET_KEY=sk-lf-...
+SKYINTEL_LANGFUSE_HOST=https://cloud.langfuse.com
+SKYINTEL_LANGFUSE_OTEL_HOST=https://cloud.langfuse.com
+
+# Playground (opt-in observability dashboard)
+SKYINTEL_PLAYGROUND_ENABLED=true         # default: true
+
+# Poll intervals
+SKYINTEL_FLIGHT_POLL_INTERVAL=30         # 30s for main, 60s for railway
+SKYINTEL_SATELLITE_POLL_INTERVAL=3600
+```
+
+> ℹ️ `.env.example` is only available when cloning the repo directly. For `pip`/`pipx` installs, create `.env` manually using the template above.
+
+---
+
 ## Deployment Branches
 
 SkyIntel ships three branches optimised for different environments:
@@ -46,7 +136,7 @@ SkyIntel ships three branches optimised for different environments:
 | **AI Chat** | ✅ Same (ADSB.lol live queries) | ✅ Same (ADSB.lol live queries) | ✅ Same + guardrail scanning |
 | **SSE Streaming** | ✅ Same | ✅ Same | ✅ Same |
 | **Playground** | ✅ Same | ✅ Same | ✅ Same + guardrail stats |
-| **PyPI** | — | ✅ `pip install skyintel==1.2.0` | — |
+| **PyPI** | — | ✅ `pip install skyintel` | — |
 
 ### Why multiple branches?
 
@@ -109,6 +199,7 @@ graph TB
     subgraph Clients["🔌 External Clients"]
         CLI[CLI<br/>skyintel ask/flights/iss]
         CD[Claude Desktop<br/>stdio]
+        CC[Claude Code<br/>Streamable HTTP]
         VS[VS Code / Cursor<br/>Streamable HTTP]
     end
 
@@ -140,10 +231,205 @@ graph TB
     PG --> DASH
 
     MCP --> CD
+    MCP --> CC
     MCP --> VS
 ```
 
 SkyIntel is a **Python/Starlette backend** with a **vanilla JS + CesiumJS frontend** and no build step. Background pollers fetch flight data from ADSB.lol (global point query + military feed) and satellite TLEs from Celestrak on fixed intervals, storing results in a SQLite database with WAL mode for concurrent reads during writes. A shared **service layer** (`service.py`) provides unified query logic consumed by three surfaces: the REST API (globe + detail panel), the MCP server (Claude Desktop / VS Code / Cursor), and the CLI. The **LLM gateway** (`gateway.py`) implements a provider-agnostic tool-calling loop via LiteLLM, supporting Claude, OpenAI, and Gemini through a single BYOK interface — with SSE streaming for real-time token delivery. The `/playground` dashboard provides an observability surface with system metrics sourced from in-memory runtime stats, guardrail monitoring via the optional LLM Guard module (graceful degradation when absent), and LangFuse analytics via REST API reads. All flight classification (military, private, commercial) is performed through pattern-based heuristics in the classifier module, and satellite positions are computed locally via SGP4 propagation using Skyfield.
+
+---
+
+## MCP Client Setup
+
+SkyIntel exposes 15 MCP tools via **two transports**:
+
+| Transport | How it works | Used by |
+|-----------|-------------|---------|
+| **Streamable HTTP** (`/mcp`) | Client connects to a running SkyIntel server | Claude Code, VS Code, Cursor |
+| **stdio** | MCP client spawns `skyintel` as a child process | Claude Desktop |
+
+### Claude Desktop ✅ Tested
+
+Claude Desktop uses **stdio** transport — it spawns `skyintel` as a child process.
+
+Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+
+**If installed via `pipx` (recommended):**
+
+```json
+{
+  "mcpServers": {
+    "skyintel": {
+      "command": "skyintel",
+      "args": ["serve", "--stdio"]
+    }
+  }
+}
+```
+
+**If installed via `pip` in a virtual environment:**
+
+```json
+{
+  "mcpServers": {
+    "skyintel": {
+      "command": "/full/path/to/.venv/bin/skyintel",
+      "args": ["serve", "--stdio"]
+    }
+  }
+}
+```
+
+Find your full path with `which skyintel` (macOS/Linux) or `where skyintel` (Windows).
+
+**After saving**, restart Claude Desktop completely (quit and reopen). Look for the 🔌 tools icon — skyintel should appear with 15 tools.
+
+**Troubleshooting:**
+- Check logs: `cat ~/Library/Logs/Claude/mcp-server-skyintel.log`
+- "No such file or directory" → use full path or install via `pipx`
+- "Could not attach" → ensure no other `skyintel serve` is running on the same port
+
+---
+
+### Claude Code ✅ Tested
+
+Claude Code uses **streamable HTTP** transport — it connects to a running SkyIntel server.
+
+First, start the server:
+
+```bash
+skyintel serve
+```
+
+Then register the MCP server:
+
+```bash
+claude mcp add skyintel --transport http http://localhost:9096/mcp
+```
+
+Verify:
+
+```bash
+claude mcp list
+```
+
+Try asking: *"What military aircraft are currently airborne?"*
+
+---
+
+### VS Code + GitHub Copilot ✅ Tested
+
+VS Code uses **streamable HTTP** transport via `.vscode/mcp.json`.
+
+First, start the server:
+
+```bash
+skyintel serve
+```
+
+Then create `.vscode/mcp.json` in your workspace:
+
+```json
+{
+  "servers": {
+    "skyintel": {
+      "url": "http://localhost:9096/mcp"
+    }
+  }
+}
+```
+
+Verify via Command Palette (Cmd+Shift+P): `MCP: List Servers` — skyintel should appear. Use **Agent mode** in Copilot Chat to access MCP tools.
+
+Try asking: *"What flights are near London right now?"*
+
+---
+
+### Cursor ✅ Compatible
+
+Cursor uses the same streamable HTTP transport as VS Code.
+
+Start the server:
+
+```bash
+skyintel serve
+```
+
+Add to `.cursor/mcp.json`:
+
+```json
+{
+  "servers": {
+    "skyintel": {
+      "url": "http://localhost:9096/mcp"
+    }
+  }
+}
+```
+
+---
+
+### Remote / Cloud Deployment
+
+If SkyIntel is deployed on a cloud platform (e.g. Railway), remote MCP clients can connect directly:
+
+**VS Code / Cursor:**
+```json
+{
+  "servers": {
+    "skyintel": {
+      "url": "https://your-app.up.railway.app/mcp"
+    }
+  }
+}
+```
+
+**Claude Code:**
+```bash
+claude mcp add skyintel --transport http https://your-app.up.railway.app/mcp
+```
+
+---
+
+### Gemini CLI 🔜 Pending
+
+Configuration pending — will be added once Gemini CLI MCP support is verified.
+
+### OpenAI Codex 🔜 Pending
+
+Configuration pending — will be added once Codex MCP support is verified.
+
+---
+
+### CLI Helper
+
+Generate MCP config snippets directly:
+
+```bash
+skyintel mcp-config              # Claude Desktop (stdio)
+skyintel mcp-config --stdio      # Claude Desktop (stdio, explicit)
+skyintel mcp-config --vscode     # VS Code / Cursor (HTTP)
+```
+
+### Available MCP Tools
+
+| Tool | Description |
+|------|-------------|
+| `flights_near` | Live flights near a geographic point |
+| `search_flight` | Search by callsign or ICAO24 hex |
+| `military_flights` | All airborne military aircraft worldwide |
+| `flights_to` | Flights heading to a destination airport |
+| `flights_from` | Flights departed from an origin airport |
+| `aircraft_info` | Aircraft metadata by ICAO24 hex |
+| `get_satellites` | Satellite positions by category |
+| `get_weather` | Current weather at any location |
+| `get_status` | System health and diagnostics |
+| `iss_position` | Real-time ISS position |
+| `iss_crew` | Current ISS crew members |
+| `iss_passes` | ISS pass predictions for a location |
+| `playground_system` | System health metrics — flights, satellites, polling, DB, data sources |
+| `playground_guardrails` | Guardrail scan/block stats — scanner status, recent blocks |
+| `playground_langfuse` | LangFuse analytics — traces, tool call frequency |
 
 ---
 
@@ -161,7 +447,7 @@ SkyIntel is a **Python/Starlette backend** with a **vanilla JS + CesiumJS fronte
 | **BYOK security model** | API keys in browser localStorage only | Keys never touch the server — sent per-request via POST body, never logged, never persisted server-side |
 | **Cesium token masking** | Server-side injection via HTML template replacement | Token never exposed in any API response. Injected into `index.html` at serve time via `%%CESIUM_TOKEN%%` placeholder |
 | **Vanilla JS, no build step** | Pure JS + CesiumJS CDN | Zero frontend toolchain complexity. No npm, no webpack, no transpilation. Deploy by copying files |
-| **FastMCP dual transport** | Streamable HTTP (`/mcp`) + stdio mode | HTTP for remote/web clients (VS Code, Cursor), stdio for local desktop clients (Claude Desktop) |
+| **FastMCP dual transport** | Streamable HTTP (`/mcp`) + stdio mode | HTTP for remote/web clients (VS Code, Cursor, Claude Code), stdio for local desktop clients (Claude Desktop) |
 | **LiteLLM as LLM gateway** | Unified API for Claude, OpenAI, Gemini | Single tool-calling implementation supports all major providers via provider prefixes |
 | **LangFuse OTEL integration** | Optional observability via LiteLLM callbacks + REST API reads for playground | Zero-code tracing of every LLM call. OTEL ingestion for writes, REST API for dashboard reads. Single host, shared credentials |
 | **SSE streaming (simple approach)** | Full tool-calling loop runs server-side, only the final LLM response is streamed | Avoids complex partial-stream/tool-call interleaving. Tool status messages sent during processing, final reply streamed token-by-token via Server-Sent Events |
@@ -208,163 +494,6 @@ These patterns are maintained for **educational purposes** and are best-effort, 
 > ⚠️ **Why different data for Globe vs Chat?** (`main` branch) The globe reads from SQLite (polled via OpenSky), while chat queries ADSB.lol live. This separation isolates polling from on-demand queries — avoids API rate limit contention and ensures globe rendering never competes with user queries. Flight counts may differ slightly — this is expected and by design.
 
 > ℹ️ **Note:** On `railway` branches, both globe and chat use ADSB.lol as the data source, but the separation pattern remains: globe reads from SQLite (polled), chat queries the API directly.
-
----
-
-## Quick Start
-
-```bash
-pip install skyintel
-```
-
-> ℹ️ `pip install skyintel` (v1.2.0) installs the `railway` branch version — ADSB.lol only, no OpenSky dependency. For the self-hosted version with OpenSky support, clone the `main` branch directly.
-
-Create a `.env` file in your project root:
-
-```bash
-cp .env.example .env
-# Edit .env with your API keys (see Configuration below)
-```
-
-Start the server:
-
-```bash
-skyintel serve
-```
-
-Open [http://localhost:9096](http://localhost:9096) in your browser.
-
----
-
-## Configuration
-
-All configuration via environment variables with `SKYINTEL_` prefix, or `.env` file:
-
-```env
-# Server
-SKYINTEL_HOST=0.0.0.0
-SKYINTEL_PORT=9096
-
-# OpenSky Network (main branch only — not needed for railway branches)
-SKYINTEL_OPENSKY_CLIENT_ID=your_client_id
-SKYINTEL_OPENSKY_CLIENT_SECRET=your_client_secret
-
-# Cesium Ion (optional — enables terrain layer)
-SKYINTEL_CESIUM_ION_TOKEN=your_token
-
-# LLM — for CLI 'ask' command (optional, web chat uses browser localStorage)
-SKYINTEL_LLM_PROVIDER=anthropic          # anthropic / openai / google
-SKYINTEL_LLM_API_KEY=sk-ant-...
-SKYINTEL_LLM_MODEL=claude-sonnet-4-20250514
-
-# LangFuse (optional — LLM observability + playground analytics)
-SKYINTEL_LANGFUSE_PUBLIC_KEY=pk-lf-...
-SKYINTEL_LANGFUSE_SECRET_KEY=sk-lf-...
-SKYINTEL_LANGFUSE_HOST=https://cloud.langfuse.com
-SKYINTEL_LANGFUSE_OTEL_HOST=https://cloud.langfuse.com
-
-# Playground (opt-in observability dashboard)
-SKYINTEL_PLAYGROUND_ENABLED=true         # default: true
-
-# Poll intervals
-SKYINTEL_FLIGHT_POLL_INTERVAL=30         # 30s for main, 60s for railway
-SKYINTEL_SATELLITE_POLL_INTERVAL=3600
-```
-
----
-
-## CLI Reference
-
-| Command | Description |
-|---------|-------------|
-| `skyintel serve` | Start server (MCP + REST + Web UI) |
-| `skyintel serve --stdio` | MCP stdio mode for Claude Desktop |
-| `skyintel status` | Show config and system status |
-| `skyintel init` | Initialise database |
-| `skyintel config` | Show current config as JSON |
-| `skyintel ask "question"` | Ask the AI a question (uses .env credentials) |
-| `skyintel ask "question" --provider anthropic --api-key sk-... --model claude-sonnet-4-20250514` | Ask with explicit credentials |
-| `skyintel flights --military` | List military flights |
-| `skyintel flights --search RYR123` | Search by callsign/hex |
-| `skyintel flights --lat 51 --lon -0.5` | Flights near a point |
-| `skyintel satellites --category iss` | List satellites by category |
-| `skyintel above --lat 51 --lon -0.5` | Flights + satellites near a point |
-| `skyintel iss` | ISS position + crew |
-| `skyintel iss --passes --lat 51 --lon -0.5` | ISS pass predictions |
-| `skyintel mcp-config` | Print MCP config for Claude Desktop |
-| `skyintel mcp-config --vscode` | Print MCP config for VS Code |
-| `skyintel mcp-config --stdio` | Print stdio MCP config |
-
----
-
-## MCP Client Setup
-
-### VS Code + GitHub Copilot ✅ Tested
-
-Add to your `.vscode/mcp.json`:
-
-```json
-{
-  "servers": {
-    "skyintel": {
-      "url": "http://localhost:9096/mcp"
-    }
-  }
-}
-```
-
-### Claude Code ✅ Tested
-
-```bash
-claude mcp add skyintel --transport http http://localhost:9096/mcp
-```
-
-### Claude Desktop 🟡 Needs Testing
-
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "skyintel": {
-      "command": "skyintel",
-      "args": ["serve", "--stdio"]
-    }
-  }
-}
-```
-
-### Gemini CLI 🔜 Pending
-
-Configuration pending — will be added once Gemini CLI MCP support is verified.
-
-### OpenAI Codex 🔜 Pending
-
-Configuration pending — will be added once Codex MCP support is verified.
-
----
-
-CLI helper: `skyintel mcp-config`, `skyintel mcp-config --vscode`, or `skyintel mcp-config --stdio`
-
-### Available MCP Tools
-
-| Tool | Description |
-|------|-------------|
-| `flights_near` | Live flights near a geographic point |
-| `search_flight` | Search by callsign or ICAO24 hex |
-| `military_flights` | All airborne military aircraft worldwide |
-| `flights_to` | Flights heading to a destination airport |
-| `flights_from` | Flights departed from an origin airport |
-| `aircraft_info` | Aircraft metadata by ICAO24 hex |
-| `get_satellites` | Satellite positions by category |
-| `get_weather` | Current weather at any location |
-| `get_status` | System health and diagnostics |
-| `iss_position` | Real-time ISS position |
-| `iss_crew` | Current ISS crew members |
-| `iss_passes` | ISS pass predictions for a location |
-| `playground_system` | System health metrics — flights, satellites, polling, DB, data sources |
-| `playground_guardrails` | Guardrail scan/block stats — scanner status, recent blocks |
-| `playground_langfuse` | LangFuse analytics — traces, tool call frequency |
 
 ---
 
@@ -417,6 +546,31 @@ Auto-refreshes every 15 seconds. Dark theme, card-based grid, fully responsive.
 
 ---
 
+## CLI Reference
+
+| Command | Description |
+|---------|-------------|
+| `skyintel --version` | Show installed version |
+| `skyintel serve` | Start server (MCP + REST + Web UI) |
+| `skyintel serve --stdio` | MCP stdio mode for Claude Desktop |
+| `skyintel status` | Show config and system status |
+| `skyintel init` | Initialise database |
+| `skyintel config` | Show current config as JSON |
+| `skyintel ask "question"` | Ask the AI a question (uses .env credentials) |
+| `skyintel ask "question" --provider anthropic --api-key sk-... --model claude-sonnet-4-20250514` | Ask with explicit credentials |
+| `skyintel flights --military` | List military flights |
+| `skyintel flights --search RYR123` | Search by callsign/hex |
+| `skyintel flights --lat 51 --lon -0.5` | Flights near a point |
+| `skyintel satellites --category iss` | List satellites by category |
+| `skyintel above --lat 51 --lon -0.5` | Flights + satellites near a point |
+| `skyintel iss` | ISS position + crew |
+| `skyintel iss --passes --lat 51 --lon -0.5` | ISS pass predictions |
+| `skyintel mcp-config` | Print MCP config for Claude Desktop |
+| `skyintel mcp-config --vscode` | Print MCP config for VS Code |
+| `skyintel mcp-config --stdio` | Print stdio MCP config |
+
+---
+
 ## API Reference
 
 | Method | Path | Description |
@@ -464,8 +618,12 @@ Open Sky Intelligence uses a tool-calling architecture where the LLM makes multi
 | `/playground` dashboard — LangFuse analytics (traces, tool heatmap) | ✅ Done |
 | SSE streaming responses | ✅ Done |
 | Chat panel expand/collapse | ✅ Done |
+| Claude Desktop MCP integration | ✅ Tested |
+| Claude Code MCP integration | ✅ Tested |
+| VS Code + GitHub Copilot MCP integration | ✅ Tested |
 | LangFuse v2 Metrics API (latency, tokens, cost in playground) | 🔜 Planned |
 | Guardrail threshold tuning + block rate improvement | 🔜 Planned |
+| Additional MCP tools (private jets, flight history) | 🔜 Planned |
 | Tool result caching — TTL-based (30-60s) on service layer | 🔜 Planned |
 | Context window tracking — `tiktoken` token counting | 🔜 Planned |
 | Hallucination detection — compare LLM response against tool results | 🔜 Planned |
