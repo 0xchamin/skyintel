@@ -2,9 +2,9 @@ import httpx
 import logging
 import asyncio
 
-from skyintel.models import NormalizedFlight
-from skyintel.flights.hubs import HUBS
-from skyintel.config import get_settings
+from voyageintel.models import NormalizedFlight
+from voyageintel.flights.hubs import HUBS
+from voyageintel.config import get_settings
 
 
 logger = logging.getLogger(__name__)

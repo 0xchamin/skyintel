@@ -1,8 +1,8 @@
 """Merge flights from ADSB.lol regional polls + military."""
 
 import logging
-from skyintel.models import NormalizedFlight
-from skyintel.flights.classifier import classify
+from voyageintel.models import NormalizedFlight
+from voyageintel.flights.classifier import classify
 
 logger = logging.getLogger(__name__)
 

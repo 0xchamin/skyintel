@@ -3,7 +3,7 @@
 import aiosqlite
 from datetime import datetime, timezone, timedelta
 from dataclasses import asdict
-from skyintel.models import NormalizedFlight
+from voyageintel.models import NormalizedFlight
 
 RETENTION_HOURS = 6
 

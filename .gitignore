@@ -50,3 +50,5 @@ htmlcov/
 
 # Local tests
 *.txt 
+
+.env_*

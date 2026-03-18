@@ -11,20 +11,20 @@ from starlette.routing import Route, Mount
 from starlette.staticfiles import StaticFiles
 import contextlib
 
-from skyintel.config import get_settings
-from skyintel.flights.adsb_lol import AdsbLolClient
-from skyintel.flights.merge import merge_flights
-from skyintel.flights.repository import insert_flights, get_latest_flights, prune_old_flights
-from skyintel.satellites.celestrak import CelestrakClient
-from skyintel.satellites.propagator import propagate_batch
-from skyintel.satellites.repository import upsert_satellites, get_satellites_by_category
-from skyintel.storage.database import get_db, close_db
-from skyintel.flights.hexdb import HexdbClient, get_aircraft_cached, get_route_cached
-from skyintel.mcp_tools import mcp
-from skyintel.llm.gateway import chat as llm_chat
-from skyintel.weather.openmeteo import OpenMeteoClient
-from skyintel.service import playground_runtime
-from skyintel import service
+from voyageintel.config import get_settings
+from voyageintel.flights.adsb_lol import AdsbLolClient
+from voyageintel.flights.merge import merge_flights
+from voyageintel.flights.repository import insert_flights, get_latest_flights, prune_old_flights
+from voyageintel.satellites.celestrak import CelestrakClient
+from voyageintel.satellites.propagator import propagate_batch
+from voyageintel.satellites.repository import upsert_satellites, get_satellites_by_category
+from voyageintel.storage.database import get_db, close_db
+from voyageintel.flights.hexdb import HexdbClient, get_aircraft_cached, get_route_cached
+from voyageintel.mcp_tools import mcp
+from voyageintel.llm.gateway import chat as llm_chat
+from voyageintel.weather.openmeteo import OpenMeteoClient
+from voyageintel.service import playground_runtime
+from voyageintel import service
 
 
 
@@ -203,7 +203,7 @@ async def api_chat_stream(request):
     if not messages or not provider or not api_key or not model:
         return JSONResponse({"error": "messages, provider, api_key, and model are required"}, status_code=400)
 
-    from skyintel.llm.gateway import chat_stream
+    from voyageintel.llm.gateway import chat_stream
     from starlette.responses import StreamingResponse
 
     return StreamingResponse(
@@ -264,7 +264,7 @@ async def api_satellites(request):
 # ── ISS ────────────────────────────────────────────────
 async def api_iss(request):
     """Get current ISS position + crew."""
-    from skyintel import service
+    from voyageintel import service
     position = await service.iss_position()
     crew = await service.iss_crew()
     return JSONResponse({"position": position, "crew": crew})
@@ -272,7 +272,7 @@ async def api_iss(request):
 
 async def api_iss_passes(request):
     """Get ISS pass predictions for a location."""
-    from skyintel import service
+    from voyageintel import service
     lat = request.query_params.get("lat")
     lon = request.query_params.get("lon")
     if lat is None or lon is None:
@@ -385,7 +385,7 @@ async def playground_langfuse(request):
 # ── Lifecycle ────────────────────────────────────────────────
 async def on_startup():
     logger.info("Open Sky Intelligence starting on %s:%d", settings.host, settings.port)
-    from skyintel.storage.migrations import run_migrations
+    from voyageintel.storage.migrations import run_migrations
     db = await get_db(settings.db_path)
     await run_migrations(db)
 

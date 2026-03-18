@@ -62,7 +62,7 @@ async function takeScreenshot() {
         viewer.render();
         const canvas = viewer.scene.canvas;
         const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/png"));
-        return new File([blob], "skyintel-snapshot.png", { type: "image/png" });
+        return new File([blob], "voyageintel-snapshot.png", { type: "image/png" });
     } catch (e) {
         console.error("Screenshot failed:", e);
         return null;
@@ -75,8 +75,8 @@ async function shareSnapshot() {
     if (navigator.share) {
         try {
             const shareData = {
-                title: "Open Sky Intelligence",
-                text: "Check out this live airspace view!",
+                title: "VoyageIntel",
+                text: "Check out this live global view of air, space, and sea view!",
                 url: url,
             };
 

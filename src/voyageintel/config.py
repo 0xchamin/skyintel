@@ -4,7 +4,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_prefix="SKYINTEL_",
+        env_prefix="VI_",
         env_file=".env",
         env_file_encoding="utf-8",
         extra="forbid",
@@ -12,11 +12,11 @@ class Settings(BaseSettings):
 
     # Server
     host: str = "0.0.0.0"
-    port: int = 9096
+    port: int = 9097
 
     # Database
     #db_path: Path = Path.home() / ".osai" / "osai.db"
-    db_path: Path = Path.home() / ".skyintel" / "skyintel.db"
+    db_path: Path = Path.home() / ".voyageintel" / "voyageintel.db"
 
     # hub
     hub_radius_nm: int = 150

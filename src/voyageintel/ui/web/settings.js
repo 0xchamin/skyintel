@@ -15,17 +15,17 @@ const DEFAULT_MODELS = {
 
 function getStoredConfig() {
     try {
-        return JSON.parse(localStorage.getItem("skyintel_llm") || "null");
+        return JSON.parse(localStorage.getItem("voyageintel_llm") || "null");
     } catch { return null; }
 }
 
 
 function saveConfig(provider, apiKey, model) {
-    localStorage.setItem("skyintel_llm", JSON.stringify({ provider, apiKey, model }));
+    localStorage.setItem("voyageintel_llm", JSON.stringify({ provider, apiKey, model }));
 }
 
 function clearConfig() {
-    localStorage.removeItem("skyintel_llm");
+    localStorage.removeItem("voyageintel_llm");
 }
 
 function openSettings() {

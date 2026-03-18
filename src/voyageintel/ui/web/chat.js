@@ -1,6 +1,6 @@
 /* chat.js — slide-out chat panel with localStorage history */
 
-const CHAT_STORAGE_KEY = "skyintel_chat_history";
+const CHAT_STORAGE_KEY = "voyageintel_chat_history";
 const MAX_HISTORY = 50;
 
 function getChatHistory() {
@@ -23,7 +23,7 @@ function initChatPanel() {
     panel.id = "chatPanel";
     panel.innerHTML = `
         <div class="chat-header">
-            <span class="chat-title">💬 Open Sky Intelligence Chat</span>
+            <span class="chat-title">💬 VoyageIntel Chat</span>
             <div style="display:flex; gap:6px;">
                 <button id="chatExpand" title="Expand/collapse" style="background:none; border:none; color:rgba(255,255,255,0.5); font-size:16px; cursor:pointer;">⇔</button>
                 <button id="chatClear" title="Clear history" style="background:none; border:none; color:rgba(255,255,255,0.5); font-size:16px; cursor:pointer;">🗑</button>

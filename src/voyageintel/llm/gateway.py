@@ -4,8 +4,8 @@ import json
 import logging
 import asyncio as _asyncio
 
-from skyintel import service
-from skyintel.config import get_settings
+from voyageintel import service
+from voyageintel.config import get_settings
 
 logger = logging.getLogger(__name__)
 

@@ -4,18 +4,18 @@ import logging
 import math
 from dataclasses import asdict
 
-from skyintel.config import get_settings
-from skyintel.storage.database import get_db
-from skyintel.flights.adsb_lol import AdsbLolClient
-from skyintel.flights.hexdb import HexdbClient, get_aircraft_cached, get_route_cached
-from skyintel.flights.repository import get_latest_flights
-from skyintel.satellites.repository import get_satellites_by_category, get_satellite_by_norad
-from skyintel.satellites.propagator import propagate_batch, propagate_one
-from skyintel.weather.openmeteo import OpenMeteoClient
+from voyageintel.config import get_settings
+from voyageintel.storage.database import get_db
+from voyageintel.flights.adsb_lol import AdsbLolClient
+from voyageintel.flights.hexdb import HexdbClient, get_aircraft_cached, get_route_cached
+from voyageintel.flights.repository import get_latest_flights
+from voyageintel.satellites.repository import get_satellites_by_category, get_satellite_by_norad
+from voyageintel.satellites.propagator import propagate_batch, propagate_one
+from voyageintel.weather.openmeteo import OpenMeteoClient
 
-from skyintel.iss.open_notify import OpenNotifyClient
-from skyintel.iss.passes import predict_passes
-from skyintel.satellites.repository import get_satellites_by_category
+from voyageintel.iss.open_notify import OpenNotifyClient
+from voyageintel.iss.passes import predict_passes
+from voyageintel.satellites.repository import get_satellites_by_category
 
 # ── Playground runtime stats (updated by server.py poll loops) ──
 playground_runtime = {
@@ -133,7 +133,7 @@ async def iss_position() -> dict:
     iss_tle = next((t for t in tles if "ZARYA" in t["name"].upper()), None)
     if not iss_tle:
         return {"error": "ISS TLE not found — satellite poller may not have run yet"}
-    from skyintel.satellites.propagator import propagate_one
+    from voyageintel.satellites.propagator import propagate_one
     pos = propagate_one(iss_tle["name"], iss_tle["tle_line1"], iss_tle["tle_line2"], iss_tle["norad_id"], "iss")
     if not pos:
         return {"error": "ISS propagation failed"}
@@ -164,7 +164,7 @@ async def get_weather(lat: float, lon: float) -> dict | None:
 
 async def get_status() -> dict:
     """Get system status."""
-    from skyintel.server import _poll_count, _last_poll_total, _last_poll_military, _satellite_count
+    from voyageintel.server import _poll_count, _last_poll_total, _last_poll_military, _satellite_count
     return {
         "status": "ok",
         "flight_poll_count": _poll_count,
@@ -221,7 +221,7 @@ async def get_playground_system() -> dict:
 async def get_playground_guardrails() -> dict:
     """Guardrail stats for playground dashboard."""
     try:
-        from skyintel.llm.guardrails import get_guardrail_stats
+        from voyageintel.llm.guardrails import get_guardrail_stats
         stats = get_guardrail_stats()
         return {**stats, "available": True}
     except ImportError:
@@ -241,7 +241,7 @@ async def get_playground_langfuse() -> dict:
     import httpx
     from base64 import b64encode
     from datetime import datetime, timezone, timedelta
-    from skyintel.llm.gateway import get_tool_call_counts as _get_tool_call_counts
+    from voyageintel.llm.gateway import get_tool_call_counts as _get_tool_call_counts
 
 
     settings = get_settings()
@@ -372,7 +372,7 @@ async def get_playground_langfuse() -> dict:
         # ── 5. Tool call frequency (v2 metrics — count by observation name) ──
                 # ── 5. Tool call frequency (from in-memory gateway tracking) ──
         try:
-            from skyintel.llm.gateway import get_tool_call_counts
+            from voyageintel.llm.gateway import get_tool_call_counts
             result["tool_calls"] = get_tool_call_counts()
         except ImportError:
             pass

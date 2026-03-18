@@ -2,7 +2,7 @@
 
 from fastmcp import FastMCP
 
-from skyintel import service
+from voyageintel import service
 
 mcp = FastMCP(
     name="Open Sky Intelligence",

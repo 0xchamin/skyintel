@@ -3,14 +3,14 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "skyintel"
-version = "1.2.2"
-description = "Self-hosted MCP server and tactical web app for real-time flight, military aircraft, and satellite tracking with AI-powered queries and an immersive 3D globe."
+name = "voyageintel"
+version = "1.0.0"
+description = "Self-hosted MCP server and tactical web app for real-time air, sea, and space tracking with AI-powered queries and an immersive 3D globe."
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.10"
 authors = [{ name = "0xchamin", email = "chmk90@gmail.com" }]
-keywords = ["mcp", "aviation", "satellite", "tracking", "adsb", "cesium", "osint", "hexdb.io", "iss", "military", "flight-tracker"]
+keywords = ["mcp", "aviation", "satellite", "tracking", "adsb", "cesium", "osint", "hexdb.io", "iss", "military", "flight-tracker",  "maritime", "ais", "vessel", "ships"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: Web Environment",
@@ -46,7 +46,7 @@ dependencies = [
 dev = ["pytest", "pytest-asyncio", "ruff", "coverage"]
 
 [project.scripts]
-skyintel = "skyintel.cli:app"
+voyageintel = "voyageintel.cli:app"
 
 [project.urls]
 Homepage = "https://github.com/0xchamin/skyintel"
@@ -54,7 +54,7 @@ Repository = "https://github.com/0xchamin/skyintel"
 Issues = "https://github.com/0xchamin/skyintel/issues"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/skyintel"]
+packages = ["src/voyageintel"]
 
 [tool.ruff]
 line-length = 120

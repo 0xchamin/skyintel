@@ -3,8 +3,8 @@ from rich.console import Console
 from rich.table import Table
 
 app = typer.Typer(
-    name="skyintel",
-    help="Open Sky Intelligence — real-time flight, military aircraft, and satellite tracking.",
+    name="voyageintel",
+    help="Voyage Intel — real-time air, sea, space tracking.",
     no_args_is_help=True,
 )
 console = Console()
@@ -12,7 +12,7 @@ console = Console()
 def version_callback(value: bool):
     if value:
         from importlib.metadata import version
-        console.print(f"skyintel {version('skyintel')}")
+        console.print(f"voyageintel {version('voyageintel')}")
         raise typer.Exit()
 
 @app.callback()
@@ -21,12 +21,12 @@ def main(version: bool = typer.Option(False, "--version", "-v", callback=version
 
 @app.command()
 def status():
-    """Show OpenSkyAI configuration and system status."""
-    from skyintel.config import get_settings
+    """Show VoyageIntel configuration and system status."""
+    from voyageintel.config import get_settings
 
     settings = get_settings()
 
-    table = Table(title="OpenSkyAI Status", show_header=False, border_style="dim")
+    table = Table(title="VoyageIntel Status", show_header=False, border_style="dim")
     table.add_column("Key", style="bold cyan")
     table.add_column("Value")
 
@@ -53,12 +53,12 @@ def serve(
     """Start the OpenSkyAI server (MCP + REST + Web UI)."""
     import uvicorn
     import logging
-    from skyintel.config import get_settings
+    from voyageintel.config import get_settings
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 
     if stdio:
-        from skyintel.mcp_tools import mcp
+        from voyageintel.mcp_tools import mcp
         mcp.run(transport="stdio")
         return
 
@@ -67,9 +67,8 @@ def serve(
     bind_host = host or settings.host
     bind_port = port or settings.port
 
-    console.print(f"[bold green]🔭 OpenSkyAI[/] starting at [bold]http://{bind_host}:{bind_port}[/]")
-    #uvicorn.run("osai.server:app", host=bind_host, port=bind_port, log_level="info")
-    uvicorn.run("skyintel.server:app", host=bind_host, port=bind_port, log_level="info")
+    console.print(f"[bold green]🚀🔭  VoyageIntel[/] starting at [bold]http://{bind_host}:{bind_port}[/]")
+    uvicorn.run("voyageintel.server:app", host=bind_host, port=bind_port, log_level="info")
 
 
 
@@ -77,9 +76,9 @@ def serve(
 def init():
     """Initialise the database (creates ~/.osai/osai.db)."""
     import asyncio
-    from skyintel.config import get_settings
-    from skyintel.storage.database import get_db, close_db
-    from skyintel.storage.migrations import run_migrations
+    from voyageintel.config import get_settings
+    from voyageintel.storage.database import get_db, close_db
+    from voyageintel.storage.migrations import run_migrations
 
     async def _init():
         settings = get_settings()
@@ -94,7 +93,7 @@ def init():
 @app.command()
 def config():
     """Open or display the current .env configuration."""
-    from skyintel.config import get_settings
+    from voyageintel.config import get_settings
 
     settings = get_settings()
     console.print(settings.model_dump_json(indent=2))
@@ -109,7 +108,7 @@ def flights(
 ):
     """List live flights — nearby, military, or search."""
     import asyncio
-    from skyintel import service
+    from voyageintel import service
 
     async def _run():
         if query:
@@ -141,7 +140,7 @@ def satellites(
 ):
     """List current satellite positions."""
     import asyncio
-    from skyintel import service
+    from voyageintel import service
 
     async def _run():
         results = await service.get_satellites(category)
@@ -168,7 +167,7 @@ def above(
 ):
     """Show flights and satellites above a location."""
     import asyncio
-    from skyintel import service
+    from voyageintel import service
 
     async def _run():
         flights_data, sats_data = await asyncio.gather(
@@ -224,7 +223,7 @@ def mcp_config(
 ):
     """Print MCP configuration snippet for Claude Desktop / VS Code / Cursor."""
     import json
-    from skyintel.config import get_settings
+    from voyageintel.config import get_settings
 
     if stdio:
         inner = {"command": "skyintel", "args": ["serve", "--stdio"]}
@@ -249,8 +248,8 @@ def ask(
 ):
     """Ask the AI a question using your LLM API key."""
     import asyncio
-    from skyintel.config import get_settings
-    from skyintel.llm.gateway import chat as llm_chat
+    from voyageintel.config import get_settings
+    from voyageintel.llm.gateway import chat as llm_chat
 
     settings = get_settings()
     p = provider or settings.llm_provider
@@ -281,7 +280,7 @@ def iss(
 ):
     """Show ISS position, crew, and pass predictions."""
     import asyncio
-    from skyintel import service
+    from voyageintel import service
 
     async def _run():
         if passes_flag:

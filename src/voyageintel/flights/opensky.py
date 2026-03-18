@@ -1,7 +1,7 @@
 import httpx
 import time
 import logging
-from skyintel.models import NormalizedFlight
+from voyageintel.models import NormalizedFlight
 
 logger = logging.getLogger(__name__)
 
