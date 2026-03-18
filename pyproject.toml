@@ -40,6 +40,7 @@ dependencies = [
     "geopy",
     "litellm>=1.80.0",
     "langfuse",
+    "websockets",
 ]
 
 [project.optional-dependencies]

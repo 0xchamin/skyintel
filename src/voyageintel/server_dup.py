@@ -25,9 +25,7 @@ from voyageintel.llm.gateway import chat as llm_chat
 from voyageintel.weather.openmeteo import OpenMeteoClient
 from voyageintel.service import playground_runtime
 from voyageintel import service
-from voyageintel.vessels.aisstream import AisStreamClient
-from voyageintel.vessels.repository import prune_stale_vessels, get_vessel_stats
-from voyageintel.ports.repository import load_ports
+
 
 
 logger = logging.getLogger(__name__)
@@ -44,9 +42,6 @@ _poll_count = 0
 _last_poll_total = 0
 _last_poll_military = 0
 _satellite_count = 0
-
-# AIS client — initialised in lifespan if API key is set
-_ais_client: AisStreamClient | None = None
 
 
 # ── Flight Poller (Regional ADSB.lol) ───────────────────────
@@ -79,6 +74,7 @@ async def flight_poll_loop():
             playground_runtime["flights_military"] = sum(1 for f in merged if f.aircraft_type == "military")
             playground_runtime["flights_private"] = sum(1 for f in merged if f.aircraft_type == "private")
 
+
             _poll_count += 1
             _last_poll_total = len(merged)
             _last_poll_military = sum(1 for f in merged if f.aircraft_type == "military")
@@ -91,6 +87,7 @@ async def flight_poll_loop():
                 _poll_count, _last_poll_total, _last_poll_military,
             )
 
+              
             logger.info("DEBUG playground_runtime flights: c=%d m=%d p=%d",
                 playground_runtime["flights_commercial"],
                 playground_runtime["flights_military"],
@@ -137,47 +134,6 @@ async def satellite_poll_loop():
         await asyncio.sleep(settings.satellite_poll_interval)
 
 
-# ── Vessel Prune Task ────────────────────────────────────────
-async def vessel_prune_loop():
-    """Prune stale vessels every 10 minutes."""
-    await asyncio.sleep(60)  # initial delay
-    logger.info("Vessel prune task started (retention=%dh)", settings.vessel_prune_hours)
-
-    while True:
-        try:
-            db = await get_db(settings.db_path)
-            await prune_stale_vessels(db, settings.vessel_prune_hours)
-        except Exception:
-            logger.exception("Vessel prune failed")
-        await asyncio.sleep(600)  # every 10 minutes
-
-
-# ── AIS Stats Updater ────────────────────────────────────────
-async def ais_stats_loop():
-    """Update playground runtime stats from AIS client every 10 seconds."""
-    await asyncio.sleep(10)
-
-    while True:
-        try:
-            if _ais_client:
-                stats = _ais_client.stats
-                playground_runtime["ais_connected"] = stats["connected"]
-                playground_runtime["ais_messages"] = stats["messages_received"]
-                playground_runtime["ais_flushes"] = stats["flushes"]
-                playground_runtime["source_health"]["aisstream"]["healthy"] = stats["connected"]
-                if stats["connected"]:
-                    playground_runtime["source_health"]["aisstream"]["last_success"] = datetime.now(timezone.utc).isoformat()
-                    playground_runtime["source_health"]["aisstream"]["error"] = None
-
-                # Update vessel counts
-                db = await get_db(settings.db_path)
-                vstats = await get_vessel_stats(db)
-                playground_runtime["vessels_total"] = vstats.get("total", 0)
-        except Exception:
-            logger.debug("AIS stats update failed", exc_info=True)
-        await asyncio.sleep(10)
-
-
 # ── Routes ───────────────────────────────────────────────────
 async def index(request):
     html = (WEB_DIR / "index.html").read_text()
@@ -193,8 +149,6 @@ async def api_status(request):
         "last_poll_total": _last_poll_total,
         "last_poll_military": _last_poll_military,
         "satellites_cached": _satellite_count,
-        "vessels_tracked": playground_runtime.get("vessels_total", 0),
-        "ais_connected": playground_runtime.get("ais_connected", False),
         "port": settings.port,
         "cesium_configured": settings.cesium_ion_token is not None,
     })
@@ -328,55 +282,6 @@ async def api_iss_passes(request):
     return JSONResponse(result)
 
 
-# ── Vessel Endpoints ─────────────────────────────────────────
-async def api_vessels(request):
-    """Get vessels in bounding box."""
-    from voyageintel.vessels.repository import get_all_vessels
-    db = await get_db(settings.db_path)
-    lat_min = float(request.query_params.get("lat_min", -90))
-    lat_max = float(request.query_params.get("lat_max", 90))
-    lon_min = float(request.query_params.get("lon_min", -180))
-    lon_max = float(request.query_params.get("lon_max", 180))
-    vessels = await get_all_vessels(db, lat_min, lat_max, lon_min, lon_max)
-    return JSONResponse(vessels)
-
-
-async def api_vessel_detail(request):
-    """Get vessel detail by MMSI."""
-    mmsi = request.path_params["mmsi"]
-    result = await service.vessel_info(mmsi)
-    if not result:
-        return JSONResponse({"error": "Vessel not found"}, status_code=404)
-    return JSONResponse(result)
-
-
-async def api_vessel_stats(request):
-    """Get vessel count by type."""
-    result = await service.vessel_stats()
-    return JSONResponse(result)
-
-
-# ── Port Endpoints ───────────────────────────────────────────
-async def api_ports(request):
-    """Get ports near a location."""
-    lat = request.query_params.get("lat")
-    lon = request.query_params.get("lon")
-    if lat is None or lon is None:
-        return JSONResponse({"error": "lat and lon required"}, status_code=400)
-    radius_km = float(request.query_params.get("radius_km", 50))
-    result = await service.ports_near(float(lat), float(lon), radius_km)
-    return JSONResponse(result)
-
-
-async def api_port_detail(request):
-    """Get port detail by UN/LOCODE."""
-    code = request.path_params["code"]
-    result = await service.port_info(code)
-    if not result:
-        return JSONResponse({"error": "Port not found"}, status_code=404)
-    return JSONResponse(result)
-
-
 # ── Playground ───────────────────────────────────────────────
 async def playground_page(request):
     settings = get_settings()
@@ -385,6 +290,78 @@ async def playground_page(request):
     html_path = Path(__file__).parent / "ui" / "playground" / "playground.html"
     return HTMLResponse(html_path.read_text())
 
+
+# async def playground_system(request):
+#     settings = get_settings()
+#     if not settings.playground_enabled:
+#         return JSONResponse({"error": "Playground disabled"}, status_code=403)
+#     db = await get_db(settings.db_path)
+
+#     # Flight counts by type
+#     row = await db.execute(
+#         """SELECT
+#             COUNT(*) as total,
+#             SUM(CASE WHEN aircraft_type='commercial' THEN 1 ELSE 0 END) as commercial,
+#             SUM(CASE WHEN aircraft_type='military' THEN 1 ELSE 0 END) as military,
+#             SUM(CASE WHEN aircraft_type='private' THEN 1 ELSE 0 END) as private
+#         FROM flights
+#         WHERE timestamp > datetime('now', '-2 minutes')"""
+#     )
+#     counts = await row.fetchone()
+
+#     # Satellite count + categories
+#     sat_row = await db.execute("SELECT COUNT(*) as total, COUNT(DISTINCT category) as cats FROM satellites")
+#     sat_counts = await sat_row.fetchone()
+
+#     # DB file size
+#     db_size = None
+#     try:
+#         db_size = os.path.getsize(settings.db_path)
+#     except OSError:
+#         pass
+
+#     uptime = time.time() - playground_runtime["start_time"] if playground_runtime["start_time"] else None
+
+#     return JSONResponse({
+#         "flights_commercial": counts["commercial"] if counts else 0,
+#         "flights_military": counts["military"] if counts else 0,
+#         "flights_private": counts["private"] if counts else 0,
+#         "satellites_cached": sat_counts["total"] if sat_counts else 0,
+#         "satellite_categories": sat_counts["cats"] if sat_counts else 0,
+#         "poll_count": playground_runtime["poll_count"],
+#         "uptime_seconds": round(uptime, 1) if uptime else None,
+#         "last_flight_poll": playground_runtime["source_health"]["adsb_lol"]["last_success"],
+#         "last_sat_poll": playground_runtime["source_health"]["celestrak"]["last_success"],
+#         "flight_poll_interval": settings.flight_poll_interval,
+#         "satellite_poll_interval": settings.satellite_poll_interval,
+#         "db_size_bytes": db_size,
+#         "db_path": str(settings.db_path),
+#         "sources": playground_runtime["source_health"],
+#         "llm_provider": settings.llm_provider,
+#         "llm_model": settings.llm_model,
+#         "llm_api_key_set": bool(settings.llm_api_key),
+#         "langfuse_configured": bool(settings.langfuse_public_key and settings.langfuse_secret_key),
+#     })
+
+
+# async def playground_guardrails(request):
+#     settings = get_settings()
+#     if not settings.playground_enabled:
+#         return JSONResponse({"error": "Playground disabled"}, status_code=403)
+#     try:
+#         from skyintel.llm.guardrails import get_guardrail_stats
+#         stats = get_guardrail_stats()
+#         return JSONResponse({**stats, "available": True})
+#     except ImportError:
+#         return JSONResponse({
+#             "available": False,
+#             "input_scans": 0,
+#             "output_scans": 0,
+#             "blocked_count": 0,
+#             "blocked_by_scanner": {},
+#             "scanners": [],
+#             "recent_blocks": [],
+#         })
 
 async def playground_system(request):
     settings = get_settings()
@@ -405,43 +382,23 @@ async def playground_langfuse(request):
         return JSONResponse({"error": "Playground disabled"}, status_code=403)
     return JSONResponse(await service.get_playground_langfuse())
 
-
 # ── Lifecycle ────────────────────────────────────────────────
 async def on_startup():
-    global _ais_client
-    logger.info("VoyageIntel starting on %s:%d", settings.host, settings.port)
+    logger.info("Open Sky Intelligence starting on %s:%d", settings.host, settings.port)
     from voyageintel.storage.migrations import run_migrations
     db = await get_db(settings.db_path)
     await run_migrations(db)
 
-    # Load ports
-    await load_ports(db)
-
-    # Start flight + satellite pollers
     asyncio.create_task(flight_poll_loop())
     asyncio.create_task(satellite_poll_loop())
 
-    # Start AIS WebSocket client if API key is set
-    if settings.aisstream_api_key:
-        _ais_client = AisStreamClient(settings.aisstream_api_key, db)
-        await _ais_client.start()
-        asyncio.create_task(vessel_prune_loop())
-        asyncio.create_task(ais_stats_loop())
-        logger.info("AIS stream enabled — maritime tracking active")
-    else:
-        logger.info("AIS stream disabled — no VI_AISSTREAM_API_KEY set")
-
 
 async def on_shutdown():
-    global _ais_client
-    if _ais_client:
-        await _ais_client.stop()
-        _ais_client = None
     await adsb.close()
     await celestrak.close()
     await weather.close()
     await close_db()
-    logger.info("VoyageIntel stopped")
+    logger.info("Open Sky Intelligence stopped")
 
 
 mcp_app = mcp.http_app(path="/")
@@ -471,18 +428,11 @@ app = Starlette(
         Route("/api/chat/stream", api_chat_stream, methods=["POST"]),
         Route("/api/iss", api_iss),
         Route("/api/iss/passes", api_iss_passes),
-        # Vessels
-        Route("/api/vessels", api_vessels),
-        Route("/api/vessel/{mmsi}", api_vessel_detail),
-        Route("/api/vessels/stats", api_vessel_stats),
-        # Ports
-        Route("/api/ports", api_ports),
-        Route("/api/port/{code}", api_port_detail),
-        # Playground
         Route("/playground", endpoint=playground_page),
         Route("/api/playground/system", endpoint=playground_system),
         Route("/api/playground/guardrails", endpoint=playground_guardrails),
         Route("/api/playground/langfuse", endpoint=playground_langfuse),
+
     ],
     lifespan=lifespan,
 )

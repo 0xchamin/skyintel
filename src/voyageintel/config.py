@@ -42,6 +42,13 @@ class Settings(BaseSettings):
     # Playground
     playground_enabled: bool = True
 
+    # AIS (maritime)
+    aisstream_api_key: str | None = None
+    ais_batch_flush_interval: float = 1.0      # seconds between batch writes
+    ais_reconnect_delay: int = 5               # initial reconnect delay (seconds)
+    vessel_prune_hours: int = 6                # remove vessels with no update after this
+
+
     @property
     def llm_configured(self) -> bool:
         return all([self.llm_provider, self.llm_api_key, self.llm_model])

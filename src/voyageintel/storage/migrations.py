@@ -1,7 +1,7 @@
 import aiosqlite
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 MIGRATIONS = {
     1: [
@@ -100,6 +100,101 @@ MIGRATIONS = {
         """,
         "UPDATE schema_version SET version = 2",
     ],
+    3: [
+        # --- Vessels ---
+        """
+        CREATE TABLE IF NOT EXISTS vessels (
+            mmsi            TEXT PRIMARY KEY,
+            imo             TEXT,
+            name            TEXT,
+            callsign        TEXT,
+            vessel_type     TEXT,
+            vessel_type_code INTEGER,
+            flag_country    TEXT,
+            latitude        REAL,
+            longitude       REAL,
+            cog             REAL,
+            sog             REAL,
+            heading         REAL,
+            rot             REAL,
+            nav_status      TEXT,
+            nav_status_code INTEGER,
+            destination     TEXT,
+            eta             TEXT,
+            draught         REAL,
+            length          REAL,
+            width           REAL,
+            source          TEXT DEFAULT 'aisstream',
+            timestamp       TEXT NOT NULL,
+            first_seen      TEXT NOT NULL,
+            updated_at      TEXT NOT NULL
+        )
+        """,
+        "CREATE INDEX IF NOT EXISTS idx_vessels_type ON vessels (vessel_type)",
+        "CREATE INDEX IF NOT EXISTS idx_vessels_timestamp ON vessels (updated_at)",
+        "CREATE INDEX IF NOT EXISTS idx_vessels_destination ON vessels (destination)",
+        "CREATE INDEX IF NOT EXISTS idx_vessels_flag ON vessels (flag_country)",
+
+        # --- Vessels R*Tree spatial index ---
+        """
+        CREATE VIRTUAL TABLE IF NOT EXISTS vessels_rtree USING rtree(
+            id,
+            min_lat, max_lat,
+            min_lon, max_lon
+        )
+        """,
+
+        # --- Ports ---
+        """
+        CREATE TABLE IF NOT EXISTS ports (
+            code            TEXT PRIMARY KEY,
+            name            TEXT NOT NULL,
+            country         TEXT,
+            latitude        REAL NOT NULL,
+            longitude       REAL NOT NULL,
+            port_type       TEXT,
+            size            TEXT
+        )
+        """,
+        "CREATE INDEX IF NOT EXISTS idx_ports_country ON ports (country)",
+
+        # --- Ports R*Tree spatial index ---
+        """
+        CREATE VIRTUAL TABLE IF NOT EXISTS ports_rtree USING rtree(
+            id,
+            min_lat, max_lat,
+            min_lon, max_lon
+        )
+        """,
+
+        # --- Vessel metadata cache ---
+        """
+        CREATE TABLE IF NOT EXISTS vessel_meta (
+            mmsi            TEXT PRIMARY KEY,
+            photo_url       TEXT,
+            owner           TEXT,
+            operator        TEXT,
+            built_year      INTEGER,
+            gross_tonnage   INTEGER,
+            deadweight      INTEGER,
+            cached_at       TEXT NOT NULL
+        )
+        """,
+
+        # --- Geocode cache ---
+        """
+        CREATE TABLE IF NOT EXISTS geocode_cache (
+            place_name      TEXT PRIMARY KEY,
+            latitude        REAL NOT NULL,
+            longitude       REAL NOT NULL,
+            formatted_addr  TEXT,
+            cached_at       TEXT NOT NULL
+        )
+        """,
+
+        "UPDATE schema_version SET version = 3",
+ ],
+
 
 }
 

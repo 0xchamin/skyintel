@@ -17,6 +17,13 @@ from voyageintel.iss.open_notify import OpenNotifyClient
 from voyageintel.iss.passes import predict_passes
 from voyageintel.satellites.repository import get_satellites_by_category
 
+from voyageintel.vessels.repository import (
+    get_vessels_near, get_vessels_by_type, search_vessel, get_vessel_by_mmsi,
+    get_military_vessels, get_all_vessels, get_vessel_stats,
+)
+from voyageintel.ports.repository import get_ports_near, get_port_by_code
+
+
 # ── Playground runtime stats (updated by server.py poll loops) ──
 playground_runtime = {
     "start_time": None,
@@ -31,7 +38,12 @@ playground_runtime = {
         "celestrak":  {"healthy": False, "last_success": None, "error": None},
         "hexdb":      {"healthy": True,  "last_success": None, "error": None},
         "open_meteo": {"healthy": True,  "last_success": None, "error": None},
+        "aisstream": {"healthy": False, "last_success": None, "error": None},
     },
+    "vessels_total": 0,
+    "ais_connected": False,
+    "ais_messages": 0,
+    "ais_flushes": 0,
 }
 
 logger = logging.getLogger(__name__)
@@ -416,6 +428,63 @@ async def get_playground_langfuse() -> dict:
             logger.warning("LangFuse daily metrics fetch failed: %s", e)
 
     return result
+
+# ── Vessel queries ───────────────────────────────────────────
+
+async def vessels_near(lat: float, lon: float, radius_km: float = 50, max_results: int = 50) -> dict:
+    """Get live vessels near a point."""
+    db = await get_db(_settings.db_path)
+    results = await get_vessels_near(db, lat, lon, radius_km, max_results)
+    return {"results": results, "total_count": len(results)}
+
+
+async def vessel_search(query: str, max_results: int = 50) -> dict:
+    """Search for a vessel by name, MMSI, or IMO."""
+    db = await get_db(_settings.db_path)
+    results = await search_vessel(db, query, max_results)
+    return {"results": results, "total_count": len(results)}
+
+
+async def military_vessels_list(max_results: int = 50) -> dict:
+    """Get all tracked military/naval vessels."""
+    db = await get_db(_settings.db_path)
+    results = await get_military_vessels(db, max_results)
+    return {"results": results, "total_count": len(results)}
+
+
+async def vessels_by_type(vessel_type: str, max_results: int = 50) -> dict:
+    """Get vessels filtered by type."""
+    db = await get_db(_settings.db_path)
+    results = await get_vessels_by_type(db, vessel_type, max_results)
+    return {"results": results, "total_count": len(results)}
+
+
+async def vessel_info(mmsi: str) -> dict | None:
+    """Get vessel detail by MMSI."""
+    db = await get_db(_settings.db_path)
+    return await get_vessel_by_mmsi(db, mmsi)
+
+
+async def vessel_stats() -> dict:
+    """Get vessel count by type."""
+    db = await get_db(_settings.db_path)
+    return await get_vessel_stats(db)
+
+
+# ── Port queries ─────────────────────────────────────────────
+
+async def ports_near(lat: float, lon: float, radius_km: float = 50, max_results: int = 20) -> dict:
+    """Find ports near a location."""
+    db = await get_db(_settings.db_path)
+    results = await get_ports_near(db, lat, lon, radius_km, max_results)
+    return {"results": results, "total_count": len(results)}
+
+
+async def port_info(code: str) -> dict | None:
+    """Get port details by UN/LOCODE."""
+    db = await get_db(_settings.db_path)
+    return await get_port_by_code(db, code)
+
 
 async def cleanup():
     """Close all HTTP clients."""
