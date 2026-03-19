@@ -1,1 +1,1 @@
-"""Open Sky Intelligence web static assets."""
+"""VoyagerIntel — real-time air, space, and vessel tracking."""

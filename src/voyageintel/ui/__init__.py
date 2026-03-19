@@ -1,1 +1,1 @@
-"""Open Sky Intelligence web UI."""
+"""VoyagerIntel — real-time air, space, and vessel tracking."""

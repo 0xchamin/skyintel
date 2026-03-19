@@ -1,1 +1,1 @@
-"""Open Sky Intelligence — real-time flight, military aircraft, and satellite tracking."""
+"""VoyagerIntel — real-time air, space, and vessel tracking."""

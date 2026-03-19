@@ -255,16 +255,6 @@ async def iss_passes(lat: float, lon: float, hours: int = 24, min_elevation: flo
     """
     return await service.iss_passes(lat, lon, hours, min_elevation)
 
-@mcp.tool()
-async def playground_system() -> dict:
-    """Get system health and operational metrics for the SkyIntel instance.
-
-    Returns flight counts (commercial/military/private), satellite cache stats,
-    poll cycle count, uptime, database size, data source health status,
-    LLM configuration, and LangFuse observability status.
-    """
-    return await service.get_playground_system()
-
 
 @mcp.tool()
 async def playground_guardrails() -> dict:

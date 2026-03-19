@@ -1,1 +1,1 @@
-"""Open Sky Intelligence storage layer."""
+"""VoyagerIntel — real-time air, space, and vessel tracking."""

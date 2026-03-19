@@ -1,1 +1,1 @@
-"""Open Sky Intelligence weather data."""
+"""VoyagerIntel — real-time air, space, and vessel tracking."""

@@ -198,8 +198,6 @@ async def get_vessel_stats(db: aiosqlite.Connection) -> dict:
 async def prune_stale_vessels(db: aiosqlite.Connection, hours: int = 6):
     """Remove vessels with no AIS update within retention window."""
     cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
-    result = await db.execute("DELETE FROM vessels WHERE updated_at < ?", (cutoff,))
-    # Clean up orphaned R*Tree entries
-    await db.execute("DELETE FROM vessels_rtree WHERE id NOT IN (SELECT rowid FROM vessels)")
+    await db.execute("DELETE FROM vessels WHERE updated_at < ?", (cutoff,))
     await db.commit()
     logger.info("Pruned stale vessels (cutoff=%s)", cutoff)
