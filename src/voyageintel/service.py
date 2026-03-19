@@ -23,6 +23,11 @@ from voyageintel.vessels.repository import (
 )
 from voyageintel.ports.repository import get_ports_near, get_port_by_code
 
+from voyageintel.weather.marine import MarineWeatherClient
+from voyageintel.geo.geocoder import Geocoder
+from voyageintel.geo.resolver import PlaceResolver
+
+
 
 # ── Playground runtime stats (updated by server.py poll loops) ──
 playground_runtime = {
@@ -47,11 +52,21 @@ playground_runtime = {
 }
 
 logger = logging.getLogger(__name__)
-
+# _settings = get_settings()
+# _adsb = AdsbLolClient()
+# _hexdb = HexdbClient()
+# _weather = OpenMeteoClient()
+# _marine_weather = MarineWeatherClient()
+# _geocoder = Geocoder(api_key=_settings.google_maps_api_key)
+# _resolver = PlaceResolver(_geocoder)
+# _open_notify = OpenNotifyClient()
+_settings = get_settings()
 _adsb = AdsbLolClient()
 _hexdb = HexdbClient()
 _weather = OpenMeteoClient()
-_settings = get_settings()
+_marine_weather = MarineWeatherClient()
+_geocoder = Geocoder(api_key=_settings.google_maps_api_key)
+_resolver = PlaceResolver(_geocoder)
 _open_notify = OpenNotifyClient()
 
 
@@ -485,6 +500,76 @@ async def port_info(code: str) -> dict | None:
     db = await get_db(_settings.db_path)
     return await get_port_by_code(db, code)
 
+# ── Marine weather ───────────────────────────────────────────
+
+async def sea_weather(lat: float, lon: float) -> dict | None:
+    """Get marine weather at a location."""
+    return await _marine_weather.get_current(lat, lon)
+
+
+# ── Geocoding ────────────────────────────────────────────────
+
+async def geocode(place_name: str) -> dict | None:
+    """Resolve a place name to coordinates."""
+    db = await get_db(_settings.db_path)
+    return await _geocoder.geocode(place_name, db)
+
+
+# ── Vessel destination/origin queries ────────────────────────
+
+async def vessels_to(destination: str, max_results: int = 50) -> dict:
+    """Find vessels heading to a destination (searches AIS destination field)."""
+    db = await get_db(_settings.db_path)
+    q = destination.strip().upper()
+    async with db.execute(
+        """
+        SELECT * FROM vessels
+        WHERE UPPER(destination) LIKE ?
+        ORDER BY vessel_type = 'military' DESC, updated_at DESC
+        LIMIT ?
+        """,
+        (f"%{q}%", max_results),
+    ) as cursor:
+        rows = await cursor.fetchall()
+        columns = [d[0] for d in cursor.description]
+        results = [dict(zip(columns, row)) for row in rows]
+    return {"results": results, "total_count": len(results)}
+
+
+async def vessels_from(port_code: str, radius_km: float = 25, max_results: int = 50) -> dict:
+    """Find vessels near/departing a port by UN/LOCODE."""
+    db = await get_db(_settings.db_path)
+    port = await get_port_by_code(db, port_code)
+    if not port:
+        return {"results": [], "total_count": 0, "error": f"Port {port_code} not found"}
+    results = await get_vessels_near(db, port["latitude"], port["longitude"], radius_km, max_results)
+    return {"results": results, "total_count": len(results), "port": port}
+
+
+# ── Cross-domain queries ────────────────────────────────────
+
+async def activity_near(lat: float, lon: float, radius_km: float = 100, max_results: int = 50) -> dict:
+    """All activity near a point — flights + vessels."""
+    flights_data = await flights_near(lat, lon, radius_km, max_results)
+    vessels_data = await vessels_near(lat, lon, radius_km, max_results)
+    return {
+        "flights": flights_data,
+        "vessels": vessels_data,
+    }
+
+
+async def military_activity(lat: float, lon: float, radius_km: float = 200, max_results: int = 50) -> dict:
+    """Military assets near a point — aircraft + naval vessels."""
+    flights_data = await flights_near(lat, lon, radius_km, max_results)
+    mil_flights = [f for f in flights_data.get("results", []) if f.get("aircraft_type") == "military"]
+
+    vessels_data = await vessels_near(lat, lon, radius_km, max_results)
+    mil_vessels = [v for v in vessels_data.get("results", []) if v.get("vessel_type") == "military"]
+
+    return {
+        "military_aircraft": {"results": mil_flights, "total_count": len(mil_flights)},
+        "military_vessels": {"results": mil_vessels, "total_count": len(mil_vessels)},
+    }
 
 async def cleanup():
     """Close all HTTP clients."""

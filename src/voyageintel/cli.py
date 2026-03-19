@@ -160,6 +160,102 @@ def satellites(
     asyncio.run(_run())
 
 @app.command()
+def vessels(
+    lat: float = typer.Option(None, help="Latitude"),
+    lon: float = typer.Option(None, help="Longitude"),
+    radius: float = typer.Option(50, help="Radius in km"),
+    military_only: bool = typer.Option(False, "--military", help="Military vessels only"),
+    vessel_type: str = typer.Option(None, "--type", help="Filter by type (cargo/tanker/passenger/fishing/etc)"),
+    query: str = typer.Option(None, "--search", help="Search by name, MMSI, or IMO"),
+):
+    """List live vessels — nearby, military, by type, or search."""
+    import asyncio
+    from voyageintel import service
+
+    async def _run():
+        if query:
+            data = await service.vessel_search(query)
+        elif military_only:
+            data = await service.military_vessels_list()
+        elif vessel_type:
+            data = await service.vessels_by_type(vessel_type)
+        elif lat is not None and lon is not None:
+            data = await service.vessels_near(lat, lon, radius)
+        else:
+            console.print("[red]Provide --search, --military, --type, or --lat/--lon[/]")
+            return
+
+        results = data.get("results", [])
+        table = Table(title=f"Vessels ({len(results)})", border_style="dim")
+        for col in ["MMSI", "Name", "Type", "Flag", "SOG (kn)", "COG", "Destination"]:
+            table.add_column(col)
+        for v in results:
+            sog = f'{v["sog"]:.1f}' if v.get("sog") is not None else ""
+            cog = f'{round(v["cog"])}°' if v.get("cog") is not None else ""
+            table.add_row(
+                v.get("mmsi", ""),
+                v.get("name") or "",
+                v.get("vessel_type", ""),
+                v.get("flag_country") or "",
+                sog, cog,
+                v.get("destination") or "",
+            )
+        console.print(table)
+        await service.cleanup()
+
+    asyncio.run(_run())
+
+
+@app.command()
+def ports(
+    lat: float = typer.Option(None, help="Latitude"),
+    lon: float = typer.Option(None, help="Longitude"),
+    radius: float = typer.Option(50, help="Radius in km"),
+    code: str = typer.Option(None, "--code", help="Look up by UN/LOCODE"),
+):
+    """Find ports — nearby or by code."""
+    import asyncio
+    from voyageintel import service
+
+    async def _run():
+        if code:
+            result = await service.port_info(code)
+            if not result:
+                console.print(f"[red]Port {code} not found[/]")
+                return
+            table = Table(title=f"Port {result['code']}", show_header=False, border_style="dim")
+            table.add_column("Key", style="bold cyan")
+            table.add_column("Value")
+            table.add_row("Code", result["code"])
+            table.add_row("Name", result["name"])
+            table.add_row("Country", result.get("country") or "")
+            table.add_row("Latitude", f'{result["latitude"]:.4f}')
+            table.add_row("Longitude", f'{result["longitude"]:.4f}')
+            table.add_row("Type", result.get("port_type") or "")
+            table.add_row("Size", result.get("size") or "")
+            console.print(table)
+        elif lat is not None and lon is not None:
+            data = await service.ports_near(lat, lon, radius)
+            results = data.get("results", [])
+            table = Table(title=f"Ports ({len(results)})", border_style="dim")
+            for col in ["Code", "Name", "Country", "Type", "Size", "Lat", "Lon"]:
+                table.add_column(col)
+            for p in results:
+                table.add_row(
+                    p["code"], p["name"], p.get("country") or "",
+                    p.get("port_type") or "", p.get("size") or "",
+                    f'{p["latitude"]:.4f}', f'{p["longitude"]:.4f}',
+                )
+            console.print(table)
+        else:
+            console.print("[red]Provide --code or --lat/--lon[/]")
+            return
+        await service.cleanup()
+
+    asyncio.run(_run())
+
+
+@app.command()
 def above(
     lat: float = typer.Option(..., help="Latitude"),
     lon: float = typer.Option(..., help="Longitude"),
@@ -226,13 +322,13 @@ def mcp_config(
     from voyageintel.config import get_settings
 
     if stdio:
-        inner = {"command": "skyintel", "args": ["serve", "--stdio"]}
+        inner = {"command": "voyageintel", "args": ["serve", "--stdio"]}
     else:
         settings = get_settings()
         inner = {"url": f"http://localhost:{settings.port}/mcp"}
 
     key = "servers" if vscode else "mcpServers"
-    config = {key: {"skyintel": inner}}
+    config = {key: {"voyageintel": inner}}
 
     target = "VS Code" if vscode else "Claude Desktop / Cursor"
     console.print(f"\n[bold cyan]Add this to your mcp.json ({target}):[/]\n")
@@ -257,7 +353,7 @@ def ask(
     m = model or settings.llm_model
 
     if not all([p, k, m]):
-        console.print("[red]LLM not configured.[/] Set SKYINTEL_LLM_PROVIDER, SKYINTEL_LLM_API_KEY, SKYINTEL_LLM_MODEL in .env or pass --provider, --api-key, --model")
+        console.print("[red]LLM not configured.[/] Set VI_LLM_PROVIDER, VI_LLM_API_KEY, VI_LLM_MODEL in .env or pass --provider, --api-key, --model")
         raise typer.Exit(1)
 
     async def _run():

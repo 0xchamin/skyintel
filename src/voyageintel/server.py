@@ -211,6 +211,20 @@ async def api_weather(request):
         return JSONResponse({"error": "weather fetch failed"}, status_code=502)
     return JSONResponse(data)
 
+async def api_sea_weather(request):
+    """Get marine weather at a lat/lon."""
+    lat = request.query_params.get("lat")
+    lon = request.query_params.get("lon")
+    if lat is None or lon is None:
+        return JSONResponse({"error": "lat and lon required"}, status_code=400)
+    from voyageintel.weather.marine import MarineWeatherClient
+    client = MarineWeatherClient()
+    data = await client.get_current(float(lat), float(lon))
+    await client.close()
+    if data is None:
+        return JSONResponse({"error": "marine weather fetch failed"}, status_code=502)
+    return JSONResponse(data)
+
 
 async def api_chat(request):
     """Chat endpoint — proxies to LLM with tool calling."""
@@ -466,6 +480,7 @@ app = Starlette(
         Route("/api/route/{callsign}", api_route),
         Route("/api/satellites", api_satellites),
         Route("/api/weather", api_weather),
+        Route("/api/sea-weather", api_sea_weather),
         Mount("/mcp", app=mcp_app),
         Route("/api/chat", api_chat, methods=["POST"]),
         Route("/api/chat/stream", api_chat_stream, methods=["POST"]),

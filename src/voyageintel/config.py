@@ -48,6 +48,10 @@ class Settings(BaseSettings):
     ais_reconnect_delay: int = 5               # initial reconnect delay (seconds)
     vessel_prune_hours: int = 6                # remove vessels with no update after this
 
+    # Google Maps (optional — enables geocoding)
+    google_maps_api_key: str | None = None
+
+
 
     @property
     def llm_configured(self) -> bool:
