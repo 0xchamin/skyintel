@@ -28,54 +28,177 @@
             padding: 0 16px;
             z-index: 200;
             gap: 8px;
-            overflow-x: auto;
         }
+
         #toolbar .brand {
             font-size: 15px;
             font-weight: 700;
             color: #0ff;
-            margin-right: 16px;
+            margin-right: 12px;
             letter-spacing: 1px;
+            white-space: nowrap;
         }
         #toolbar .divider {
             width: 1px;
             height: 24px;
             background: rgba(255,255,255,0.15);
-            margin: 0 8px;
-        }
-        #toolbar .section-label {
-            font-size: 10px;
-            text-transform: uppercase;
-            color: rgba(255,255,255,0.4);
-            letter-spacing: 1px;
-            margin-right: 6px;
+            margin: 0 6px;
+            flex-shrink: 0;
         }
 
-        /* ── Toggle chips ────────────────────────── */
-        .chip {
+        /* ── Dropdown menus ──────────────────────── */
+        .dropdown {
+            position: relative;
+        }
+        .dropdown-btn {
             display: inline-flex;
             align-items: center;
             gap: 4px;
-            padding: 4px 10px;
-            border-radius: 12px;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            user-select: none;
+            border: 1px solid rgba(255,255,255,0.2);
+            color: #fff;
+            background: rgba(255,255,255,0.06);
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        .dropdown-btn:hover {
+            background: rgba(255,255,255,0.12);
+            border-color: rgba(255,255,255,0.3);
+        }
+        .dropdown-btn .arrow {
+            font-size: 10px;
+            opacity: 0.6;
+        }
+        .dropdown-menu {
+            display: none;
+            position: absolute;
+            top: calc(100% + 6px);
+            left: 0;
+            background: rgba(20, 20, 30, 0.96);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 10px;
+            padding: 8px 0;
+            min-width: 200px;
+            z-index: 300;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        }
+        .dropdown-menu.open {
+            display: block;
+        }
+        .dropdown-menu .toggle-all {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 14px;
+            font-size: 11px;
+            color: rgba(255,255,255,0.5);
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            margin-bottom: 4px;
+        }
+        .dropdown-menu .toggle-all button {
+            background: none;
+            border: none;
+            color: #0ff;
+            font-size: 11px;
+            cursor: pointer;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+        .dropdown-menu .toggle-all button:hover {
+            background: rgba(0,255,255,0.1);
+        }
+        .dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 14px;
+            cursor: pointer;
+            transition: background 0.15s;
+            font-size: 12px;
+            color: #fff;
+        }
+        .dropdown-item:hover {
+            background: rgba(255,255,255,0.06);
+        }
+        .dropdown-item input[type="checkbox"] {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            border: 1.5px solid rgba(255,255,255,0.3);
+            border-radius: 3px;
+            background: transparent;
+            cursor: pointer;
+            position: relative;
+            flex-shrink: 0;
+        }
+        .dropdown-item input[type="checkbox"]:checked {
+            background: #0ff;
+            border-color: #0ff;
+        }
+        .dropdown-item input[type="checkbox"]:checked::after {
+            content: "✓";
+            position: absolute;
+            top: -1px;
+            left: 1px;
+            font-size: 11px;
+            color: #000;
+            font-weight: 700;
+        }
+        .dropdown-item .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .dropdown-item .item-label {
+            flex: 1;
+        }
+
+        /* ── Toolbar buttons ─────────────────────── */
+        .toolbar-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 6px 12px;
+            border-radius: 8px;
             font-size: 12px;
             cursor: pointer;
             user-select: none;
-            transition: all 0.2s;
-            border: 1px solid rgba(255,255,255,0.15);
+            border: 1px solid rgba(255,255,255,0.2);
             color: #fff;
+            background: rgba(255,255,255,0.06);
+            transition: all 0.2s;
+            text-decoration: none;
+            white-space: nowrap;
         }
-        .chip.active {
-            border-color: currentColor;
-            background: rgba(255,255,255,0.1);
+        .toolbar-btn:hover {
+            background: rgba(255,255,255,0.12);
+            border-color: rgba(255,255,255,0.3);
         }
-        .chip:not(.active) {
-            opacity: 0.4;
+        .toolbar-btn.accent {
+            color: #0ff;
+            border-color: rgba(0,255,255,0.3);
         }
-        .chip .dot {
-            width: 8px; height: 8px;
-            border-radius: 50%;
-            display: inline-block;
+        .toolbar-btn.accent:hover {
+            background: rgba(0,255,255,0.1);
+            border-color: #0ff;
+        }
+        .toolbar-link {
+            color: rgba(255,255,255,0.5);
+            text-decoration: none;
+            font-size: 11px;
+            white-space: nowrap;
+            transition: color 0.2s;
+        }
+        .toolbar-link:hover {
+            color: #fff;
         }
 
         /* ── Detail panel ────────────────────────── */
@@ -116,31 +239,6 @@
         #detailContent {
             padding: 16px;
         }
-
-        /* #waitlist {
-            position: absolute;
-            bottom: 60px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 10;
-        }
-        #waitlist a {
-            background: rgba(20, 20, 30, 0.85);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255,255,255,0.1);
-            color: #fff;
-            padding: 8px 14px;
-            border-radius: 8px;
-            text-decoration: none;
-            font-size: 13px;
-            display: inline-block;
-        }
-        #waitlist a:hover {
-            background: rgba(40, 40, 60, 0.95);
-            border-color: rgba(255,255,255,0.3);
-        } */
-
-
         .detail-header {
             display: flex;
             align-items: center;
@@ -181,7 +279,6 @@
             font-weight: 500;
             text-align: right;
         }
-        /* ── Fly-to button ───────────────────────── */
         .flyto-btn {
             width: 100%;
             padding: 10px;
@@ -225,18 +322,36 @@
             color: #fff;
             padding: 8px 24px;
             border-radius: 20px;
-            font-size: 13px;
-            letter-spacing: 0.5px;
+            font-size: 12px;
+            letter-spacing: 0.3px;
             z-index: 100;
             pointer-events: none;
             backdrop-filter: blur(8px);
             border: 1px solid rgba(255, 255, 255, 0.1);
             display: flex;
-            gap: 16px;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
         }
         .sb-item { opacity: 0.9; }
-        .sb-mil { color: #ef5350; }
-        .sb-prv { color: #CE93D8; }
+        .sb-sep {
+            color: rgba(255,255,255,0.2);
+            margin: 0 4px;
+        }
+        #trackISSBtn {
+            background: rgba(255,214,0,0.15);
+            border: 1px solid #FFD600;
+            color: #FFD600;
+            border-radius: 12px;
+            padding: 4px 12px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            pointer-events: auto;
+        }
+        #trackISSBtn:hover {
+            background: rgba(255,214,0,0.3);
+        }
 
         /* ── Loading ─────────────────────────────── */
         #loadingOverlay {
@@ -271,46 +386,140 @@
         <span class="brand">VoyageIntel</span>
         <div class="divider"></div>
 
-        <span class="section-label">Flights</span>
-        <span class="chip active" data-type="flight" data-value="commercial" style="color:#fff">
-            <span class="dot" style="background:#fff"></span> Commercial
-        </span>
-        <span class="chip active" data-type="flight" data-value="military" style="color:#ef5350">
-            <span class="dot" style="background:#ef5350"></span> Military
-        </span>
-        <span class="chip active" data-type="flight" data-value="private" style="color:#CE93D8">
-            <span class="dot" style="background:#CE93D8"></span> Private
-        </span>
+        <!-- Flights Dropdown -->
+        <div class="dropdown" id="flightsDropdown">
+            <button class="dropdown-btn" onclick="toggleDropdown('flightsDropdown')">✈ Flights <span class="arrow">▾</span></button>
+            <div class="dropdown-menu">
+                <div class="toggle-all">
+                    <span>Toggle</span>
+                    <div>
+                        <button onclick="setAllFlights(true)">Show All</button>
+                        <button onclick="setAllFlights(false)">Hide All</button>
+                    </div>
+                </div>
+                <label class="dropdown-item" onclick="event.stopPropagation()">
+                    <input type="checkbox" checked data-type="flight" data-value="commercial">
+                    <span class="dot" style="background:#fff"></span>
+                    <span class="item-label">Commercial</span>
+                </label>
+                <label class="dropdown-item" onclick="event.stopPropagation()">
+                    <input type="checkbox" checked data-type="flight" data-value="military">
+                    <span class="dot" style="background:#ef5350"></span>
+                    <span class="item-label">Military</span>
+                </label>
+                <label class="dropdown-item" onclick="event.stopPropagation()">
+                    <input type="checkbox" checked data-type="flight" data-value="private">
+                    <span class="dot" style="background:#CE93D8"></span>
+                    <span class="item-label">Private</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Satellites Dropdown -->
+        <div class="dropdown" id="satellitesDropdown">
+            <button class="dropdown-btn" onclick="toggleDropdown('satellitesDropdown')">🛰 Satellites <span class="arrow">▾</span></button>
+            <div class="dropdown-menu">
+                <div class="toggle-all">
+                    <span>Toggle</span>
+                    <div>
+                        <button onclick="setAllSatellites(true)">Show All</button>
+                        <button onclick="setAllSatellites(false)">Hide All</button>
+                    </div>
+                </div>
+                <label class="dropdown-item" onclick="event.stopPropagation()">
+                    <input type="checkbox" checked data-type="sat" data-value="iss">
+                    <span class="dot" style="background:#FFD600"></span>
+                    <span class="item-label">Space Stations</span>
+                </label>
+                <label class="dropdown-item" onclick="event.stopPropagation()">
+                    <input type="checkbox" checked data-type="sat" data-value="military">
+                    <span class="dot" style="background:#ef5350"></span>
+                    <span class="item-label">Military</span>
+                </label>
+                <label class="dropdown-item" onclick="event.stopPropagation()">
+                    <input type="checkbox" checked data-type="sat" data-value="weather">
+                    <span class="dot" style="background:#00BFFF"></span>
+                    <span class="item-label">Weather</span>
+                </label>
+                <label class="dropdown-item" onclick="event.stopPropagation()">
+                    <input type="checkbox" checked data-type="sat" data-value="nav">
+                    <span class="dot" style="background:#00E676"></span>
+                    <span class="item-label">Nav</span>
+                </label>
+                <label class="dropdown-item" onclick="event.stopPropagation()">
+                    <input type="checkbox" checked data-type="sat" data-value="science">
+                    <span class="dot" style="background:#FF9800"></span>
+                    <span class="item-label">Science</span>
+                </label>
+                <label class="dropdown-item" onclick="event.stopPropagation()">
+                    <input type="checkbox" data-type="sat" data-value="starlink">
+                    <span class="dot" style="background:#6495ED"></span>
+                    <span class="item-label">Starlink</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Vessels Dropdown -->
+        <div class="dropdown" id="vesselsDropdown">
+            <button class="dropdown-btn" onclick="toggleDropdown('vesselsDropdown')">🚢 Vessels <span class="arrow">▾</span></button>
+            <div class="dropdown-menu">
+                <div class="toggle-all">
+                    <span>Toggle</span>
+                    <div>
+                        <button onclick="setAllVessels(true)">Show All</button>
+                        <button onclick="setAllVessels(false)">Hide All</button>
+                    </div>
+                </div>
+                <label class="dropdown-item" onclick="event.stopPropagation()">
+                    <input type="checkbox" checked data-type="vessel" data-value="cargo">
+                    <span class="dot" style="background:#4FC3F7"></span>
+                    <span class="item-label">Cargo</span>
+                </label>
+                <label class="dropdown-item" onclick="event.stopPropagation()">
+                    <input type="checkbox" checked data-type="vessel" data-value="tanker">
+                    <span class="dot" style="background:#FF8A65"></span>
+                    <span class="item-label">Tanker</span>
+                </label>
+                <label class="dropdown-item" onclick="event.stopPropagation()">
+                    <input type="checkbox" checked data-type="vessel" data-value="passenger">
+                    <span class="dot" style="background:#fff"></span>
+                    <span class="item-label">Passenger</span>
+                </label>
+                <label class="dropdown-item" onclick="event.stopPropagation()">
+                    <input type="checkbox" checked data-type="vessel" data-value="military">
+                    <span class="dot" style="background:#EF5350"></span>
+                    <span class="item-label">Naval</span>
+                </label>
+                <label class="dropdown-item" onclick="event.stopPropagation()">
+                    <input type="checkbox" checked data-type="vessel" data-value="fishing">
+                    <span class="dot" style="background:#66BB6A"></span>
+                    <span class="item-label">Fishing</span>
+                </label>
+                <label class="dropdown-item" onclick="event.stopPropagation()">
+                    <input type="checkbox" checked data-type="vessel" data-value="recreational">
+                    <span class="dot" style="background:#00BCD4"></span>
+                    <span class="item-label">Recreational</span>
+                </label>
+                <label class="dropdown-item" onclick="event.stopPropagation()">
+                    <input type="checkbox" checked data-type="vessel" data-value="special">
+                    <span class="dot" style="background:#AB47BC"></span>
+                    <span class="item-label">Special</span>
+                </label>
+                <label class="dropdown-item" onclick="event.stopPropagation()">
+                    <input type="checkbox" checked data-type="vessel" data-value="high_speed">
+                    <span class="dot" style="background:#FFD54F"></span>
+                    <span class="item-label">High Speed</span>
+                </label>
+            </div>
+        </div>
 
         <div class="divider"></div>
 
-        <span class="section-label">Satellites</span>
-        <span class="chip active" data-type="sat" data-value="iss" style="color:#FFD600">
-            <span class="dot" style="background:#FFD600"></span> Space Stations
-        </span>
-        <span class="chip active" data-type="sat" data-value="military" style="color:#ef5350">
-            <span class="dot" style="background:#ef5350"></span> Military
-        </span>
-        <span class="chip active" data-type="sat" data-value="weather" style="color:#00BFFF">
-            <span class="dot" style="background:#00BFFF"></span> Weather
-        </span>
-        <span class="chip active" data-type="sat" data-value="nav" style="color:#00E676">
-            <span class="dot" style="background:#00E676"></span> Nav
-        </span>
-        <span class="chip active" data-type="sat" data-value="science" style="color:#FF9800">
-            <span class="dot" style="background:#FF9800"></span> Science
-        </span>
-        <span class="chip" data-type="sat" data-value="starlink" style="color:#6495ED">
-            <span class="dot" style="background:#6495ED"></span> Starlink
-        </span>
+        <button class="toolbar-btn accent" onclick="shareSnapshot()">📤 Share</button>
 
         <div class="divider"></div>
-        <button id="shareBtn" class="chip active" style="color:#0ff; cursor:pointer; border-color:#0ff" onclick="shareSnapshot()">
-            📤 Share
-        </button>
 
-        <div class="divider"></div>
-        <span class="section-label">Layers</span>
+        <span style="font-size:10px; text-transform:uppercase; color:rgba(255,255,255,0.4); letter-spacing:1px; white-space:nowrap;">Layers</span>
         <select id="layerPicker" style="background:rgba(255,255,255,0.1); color:#fff; border:1px solid rgba(255,255,255,0.2); border-radius:8px; padding:4px 8px; font-size:12px; cursor:pointer;">
             <option value="dark">🌑 Dark</option>
             <option value="satellite">🛰 Satellite</option>
@@ -318,14 +527,14 @@
             <option value="terrain">⛰ Terrain</option>
         </select>
 
-        <button id="settingsBtn" class="chip active" style="color:#0ff; cursor:pointer; border-color:#0ff" onclick="openSettings()">
-            ⚙ Settings
-        </button>
+        <button class="toolbar-btn accent" onclick="openSettings()">⚙ Settings</button>
 
-        <!-- <div class="divider"></div>
-        <button id="chatBtn" class="chip active" style="color:#0ff; cursor:pointer; border-color:#0ff">
-            💬 Chat
-        </button> -->
+        <div style="flex:1"></div>
+        <a href="https://github.com/0xchamin/skyintel" target="_blank" class="toolbar-link">⭐ GitHub</a>
+        <a href="https://pypi.org/project/skyintel/" target="_blank" class="toolbar-link">📦 PyPI</a>
+        <a href="https://buymeacoffee.com/0xchamin" target="_blank" class="toolbar-link">☕ Support</a>
+        <a href="https://buttondown.com/skyintel" target="_blank" class="toolbar-link">🚀 Waitlist</a>
+            
     </div>
 
     <!-- Detail panel -->
@@ -337,38 +546,23 @@
 
     <!-- Status bar -->
     <div id="statusBar">
-        <span id="flightStatusBar" class="sb-item">✈ 0</span>
-        <span id="satStatusBar" class="sb-item">🛰 0</span>
-        <button id="trackISSBtn" onclick="trackISS()" style="
-            background:rgba(255,214,0,0.15); border:1px solid #FFD600;
-            color:#FFD600; border-radius:12px; padding:4px 12px;
-            font-size:12px; font-weight:600; cursor:pointer;
-            pointer-events:auto;
-        ">🛰 Track ISS</button>
-        <a href="https://github.com/0xchamin/skyintel" target="_blank" style="
-            color:rgba(255,255,255,0.6); text-decoration:none; font-size:12px;
-            pointer-events:auto; transition:color 0.2s;
-        " onmouseover="this.style.color='#fff'" onmouseout="this.style.color='rgba(255,255,255,0.6)'">⭐ GitHub</a>
-        <a href="https://pypi.org/project/skyintel/" target="_blank" style="
-            color:rgba(79,195,247,0.6); text-decoration:none; font-size:12px;
-            pointer-events:auto; transition:color 0.2s;
-        " onmouseover="this.style.color='#4fc3f7'" onmouseout="this.style.color='rgba(79,195,247,0.6)'">📦 PyPI</a>
+        <span id="flightStatusBar">✈ 0</span>
+        <span class="sb-sep">|</span>
+        <span id="vesselStatusBar">🚢 0</span>
+        <span class="sb-sep">|</span>
+        <span id="satStatusBar">🛰 0</span>
+        <span class="sb-sep">|</span>
+        <button id="trackISSBtn" onclick="trackISS()">🛰 Track ISS</button>
+    </div>
 
-        <a href="https://buymeacoffee.com/0xchamin" target="_blank" style="
-            color:rgba(255,214,0,0.6); text-decoration:none; font-size:12px;
-            pointer-events:auto; transition:color 0.2s;
-        " onmouseover="this.style.color='#FFD600'" onmouseout="this.style.color='rgba(255,214,0,0.6)'">☕ Support</a>
-         <a href="https://buttondown.com/skyintel" target="_blank" style="
-            color:rgba(255,255,255,0.6); text-decoration:none; font-size:12px;
-            pointer-events:auto; transition:color 0.2s;
-            " onmouseover="this.style.color='#fff'" onmouseout="this.style.color='rgba(255,255,255,0.6)'">🚀 Join Waitlist Now!!!</a>
-    </div> 
     <!-- Loading -->
     <div id="loadingOverlay">
         <div class="spinner"></div>
         <div>🔭 Loading…</div>
     </div>
-        <button id="chatBtn" style="
+
+    <!-- Chat FAB -->
+    <button id="chatBtn" style="
         position:fixed; bottom:24px; right:24px; z-index:200;
         width:56px; height:56px; border-radius:50%;
         background:rgba(0,255,255,0.15); border:2px solid #0ff;
@@ -379,9 +573,9 @@
        onmouseout="this.style.background='rgba(0,255,255,0.15)'"
     >💬</button>
 
-
     <script src="/static/flights.js"></script>
     <script src="/static/satellites.js"></script>
+    <script src="/static/vessels.js"></script>
     <script src="/static/detail.js"></script>
     <script src="/static/share.js"></script>
     <script src="/static/layers.js"></script>
@@ -389,6 +583,66 @@
     <script src="/static/chat.js"></script>
 
     <script>
+        // ── Dropdown logic ──────────────────────────
+        function toggleDropdown(id) {
+            const dropdown = document.getElementById(id);
+            const menu = dropdown.querySelector('.dropdown-menu');
+            const wasOpen = menu.classList.contains('open');
+
+            // Close all dropdowns first
+            document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('open'));
+
+            if (!wasOpen) {
+                menu.classList.add('open');
+            }
+        }
+
+        // Close dropdowns on click outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.dropdown')) {
+                document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('open'));
+            }
+        });
+
+        // Checkbox change handlers
+        document.querySelectorAll('.dropdown-item input[type="checkbox"]').forEach(cb => {
+            cb.addEventListener('change', () => {
+                const type = cb.dataset.type;
+                const value = cb.dataset.value;
+                const checked = cb.checked;
+
+                if (type === 'flight') {
+                    setFlightToggle(value, checked, viewer);
+                } else if (type === 'sat') {
+                    setSatToggle(value, checked, viewer);
+                } else if (type === 'vessel') {
+                    setVesselToggle(value, checked, viewer);
+                }
+            });
+        });
+
+        function setAllFlights(state) {
+            document.querySelectorAll('input[data-type="flight"]').forEach(cb => {
+                cb.checked = state;
+                setFlightToggle(cb.dataset.value, state, viewer);
+            });
+        }
+
+        function setAllSatellites(state) {
+            document.querySelectorAll('input[data-type="sat"]').forEach(cb => {
+                cb.checked = state;
+                setSatToggle(cb.dataset.value, state, viewer);
+            });
+        }
+
+        function setAllVessels(state) {
+            document.querySelectorAll('input[data-type="vessel"]').forEach(cb => {
+                cb.checked = state;
+                setVesselToggle(cb.dataset.value, state, viewer);
+            });
+        }
+
+        // ── Cesium viewer ───────────────────────────
         const viewer = new Cesium.Viewer("cesiumContainer", {
             imageryProvider: false,
             baseLayerPicker: false,
@@ -425,24 +679,6 @@
             },
         });
 
-        // Toggle chips (only for flight/sat types)
-        document.querySelectorAll(".chip").forEach(chip => {
-            chip.addEventListener("click", () => {
-                const type = chip.dataset.type;
-                if (!type) return;
-
-                chip.classList.toggle("active");
-                const isActive = chip.classList.contains("active");
-                const value = chip.dataset.value;
-
-                if (type === "flight") {
-                    setFlightToggle(value, isActive, viewer);
-                } else if (type === "sat") {
-                    setSatToggle(value, isActive, viewer);
-                }
-            });
-        });
-
         // Init panels
         initDetailPanel(viewer);
         initChatPanel();
@@ -454,6 +690,7 @@
         Promise.all([
             startFlightTracking(viewer),
             startSatelliteTracking(viewer),
+            startVesselTracking(viewer),
         ]).then(() => {
             document.getElementById("loadingOverlay").style.display = "none";
         });

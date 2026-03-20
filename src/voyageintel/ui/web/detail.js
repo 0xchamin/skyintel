@@ -24,15 +24,20 @@ function initDetailPanel(viewer) {
         }
 
         const data = picked.primitive.id;
+        console.log("Picked data:", data);
+
 
         if (data.icao24) {
             showFlightDetail(data, content);
         } else if (data.norad_id !== undefined) {
             showSatelliteDetail(data, content);
+        } else if (data.mmsi) {
+            showVesselDetail(data, content);
         } else {
             panel.classList.remove("open");
             return;
         }
+
 
         panel.classList.add("open");
     }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
@@ -363,5 +368,82 @@ async function showISSDetail(s, el) {
     // Fetch next passes (use ISS position as observer for demo, ideally user location)
     if (canFlyTo) {
         fetchWeather(s.latitude, s.longitude);
+    }
+}
+
+function showVesselDetail(v, el) {
+    const typeColors = {
+        cargo: "#4FC3F7", tanker: "#FF8A65", passenger: "#fff",
+        military: "#EF5350", fishing: "#66BB6A", recreational: "#00BCD4",
+        high_speed: "#FFD54F", special: "#AB47BC", unknown: "#9E9E9E",
+    };
+    const color = typeColors[v.vessel_type] || "#9E9E9E";
+    const badge = `<span class="detail-badge" style="background:${color};color:#000">${(v.vessel_type || "unknown").toUpperCase()}</span>`;
+    const canFlyTo = v.latitude != null && v.longitude != null;
+
+    el.innerHTML = `
+        <div class="detail-header">
+            <div class="detail-title">🚢 ${v.name || v.mmsi}</div>
+            ${badge}
+        </div>
+        ${canFlyTo ? `<button class="flyto-btn" onclick="flyToTarget(${v.latitude}, ${v.longitude}, 5000)">📍 Fly to vessel</button>` : ""}
+        <div class="detail-section">
+            ${row("MMSI", v.mmsi)}
+            ${row("IMO", v.imo)}
+            ${row("Callsign", v.callsign)}
+            ${row("Flag", v.flag_country)}
+            ${row("Type Code", v.vessel_type_code)}
+        </div>
+        <div class="detail-section">
+            ${row("SOG", v.sog != null ? v.sog.toFixed(1) : null, "kn")}
+            ${row("COG", v.cog != null ? Math.round(v.cog) + "°" : null)}
+            ${row("Heading", v.heading != null ? Math.round(v.heading) + "°" : null)}
+            ${row("Rate of Turn", v.rot != null ? v.rot.toFixed(1) : null, "°/min")}
+            ${row("Nav Status", v.nav_status)}
+        </div>
+        <div class="detail-section">
+            ${row("Length", v.length, "m")}
+            ${row("Width", v.width, "m")}
+            ${row("Draught", v.draught, "m")}
+        </div>
+        <div class="detail-section">
+            ${row("Destination", v.destination)}
+            ${row("ETA", v.eta)}
+        </div>
+        <div id="seaWeatherSection"></div>
+    `;
+
+    if (canFlyTo) {
+        fetchSeaWeather(v.latitude, v.longitude);
+    }
+}
+
+async function fetchSeaWeather(lat, lon) {
+    const section = document.getElementById("seaWeatherSection");
+    if (!section) return;
+    section.innerHTML = `<div class="detail-section" style="opacity:0.5">Loading sea weather…</div>`;
+
+    try {
+        const resp = await fetch(`/api/sea-weather?lat=${lat}&lon=${lon}`);
+        if (!resp.ok) throw new Error("Failed");
+        const w = await resp.json();
+
+        section.innerHTML = `
+            <div class="detail-section">
+                <div class="detail-row" style="margin-bottom:6px">
+                    <span class="detail-label" style="font-size:14px;color:#0ff">🌊 Sea Conditions</span>
+                </div>
+                ${row("Wave Height", w.wave_height_m, "m")}
+                ${row("Wave Period", w.wave_period_s, "s")}
+                ${row("Wave Direction", w.wave_direction != null ? Math.round(w.wave_direction) + "°" : null)}
+                ${row("Swell Height", w.swell_height_m, "m")}
+                ${row("Swell Period", w.swell_period_s, "s")}
+                ${row("Swell Direction", w.swell_direction != null ? Math.round(w.swell_direction) + "°" : null)}
+                ${row("Current", w.current_velocity_ms, "m/s")}
+                ${row("Current Dir", w.current_direction != null ? Math.round(w.current_direction) + "°" : null)}
+            </div>
+        `;
+    } catch (e) {
+        section.innerHTML = `<div class="detail-section" style="opacity:0.4">Sea weather unavailable</div>`;
     }
 }
