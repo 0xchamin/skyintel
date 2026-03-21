@@ -2,10 +2,16 @@
 
 **Unified real-time air, sea, and space tracking with AI-powered queries and an immersive 3D globe.**
 
+[![PyPI](https://img.shields.io/pypi/v/voyageintel)](https://pypi.org/project/voyageintel/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://python.org)
 
 ![Demo](demo.gif)
+
+> **📌 Evolution:** VoyageIntel extends [SkyIntel](https://github.com/0xchamin/skyintel/tree/railway)
+> (flight + satellite tracking) with full maritime intelligence — real-time AIS vessel tracking,
+> port monitoring, and sea weather. The original air + space version remains available on the
+> [`railway` branch](https://github.com/0xchamin/skyintel/tree/railway).
 
 ---
 
@@ -138,13 +144,13 @@ VoyageIntel starts with whatever API keys are available. Missing keys disable th
 
 ## Deployment Branches
 
-VoyageIntel ships three branches optimised for different environments:
+VoyageIntel uses `voyageintel` as the **default branch**. The `railway` branch contains the original SkyIntel (flights + satellites only).
 
-| | `voyageintel` | `railway` | `railway-guardrails` |
+| | `voyageintel` (default) | `railway` | `railway-guardrails` |
 |---|---|---|---|
-| **Use case** | Development + maritime features | Cloud demo (Railway, Render, Fly.io) | Cloud demo + enhanced chat safety |
+| **Use case** | Full platform — air + sea + space | Cloud demo — air + space only (original SkyIntel) | Cloud demo + enhanced chat safety |
 | **Flight data** | ADSB.lol global feed | ADSB.lol global feed | ADSB.lol global feed |
-| **Vessel data** | aisstream.io WebSocket | aisstream.io WebSocket | aisstream.io WebSocket |
+| **Vessel data** | aisstream.io WebSocket | — | — |
 | **Poll strategy** | ADSB.lol global + `/v2/mil` | ADSB.lol global + `/v2/mil` | ADSB.lol global + `/v2/mil` |
 | **Guardrails** | System prompt only | System prompt only | System prompt + LLM Guard |
 | **Extra memory** | — | — | ~500MB for guardrail models |
@@ -153,6 +159,12 @@ VoyageIntel ships three branches optimised for different environments:
 ### ADSB.lol Coverage
 
 ADSB.lol is a **crowdsourced network** of volunteer ADS-B feeders. Coverage is excellent in North America, Europe, and parts of Asia, but sparse in regions with fewer feeders (e.g. central China, much of Africa, central Russia). This is a data availability limitation of the volunteer feeder network, not something that can be resolved in code.
+
+### AIS Coverage Limitation
+
+VoyageIntel currently uses **terrestrial AIS only**, received via aisstream.io's shore-based receiver network. Effective range is approximately **50–70 nautical miles from shore**. Mid-ocean vessels are **not visible** unless they pass within range of a coastal receiver.
+
+Satellite AIS providers (Spire, exactEarth, ORBCOMM) offer global ocean coverage but are **not currently integrated**. This is a known limitation — satellite AIS integration is a candidate for future development.
 
 ---
 
@@ -249,6 +261,26 @@ VoyageIntel is a **Python/Starlette backend** with a **vanilla JS + CesiumJS fro
 
 ---
 
+## Vessel Icon Types
+
+Vessels are rendered on the CesiumJS globe using a `BillboardCollection` with 9 distinct icon silhouettes, colour-coded by AIS ship type:
+
+| Type | Colour | AIS Ship Type Codes | Description |
+|------|--------|-------------------|-------------|
+| Cargo | 🔵 Blue | 70–79 | Bulk carriers, container ships, general cargo |
+| Tanker | 🟠 Orange | 80–89 | Oil, chemical, LNG/LPG tankers |
+| Passenger | ⚪ White | 60–69 | Cruise ships, ferries, passenger vessels |
+| Military | 🔴 Red | 35 | Naval vessels (also detected by name patterns: USS, HMS, HMAS, etc.) |
+| Fishing | 🟢 Green | 30 | Fishing vessels |
+| Recreational | 🩵 Cyan | 36–37 | Sailing yachts, pleasure craft |
+| High Speed | 🟡 Yellow | 40–49 | High-speed craft, hydrofoils, WIG |
+| Special | 🟣 Purple | 50–59 | Tugs, pilot vessels, SAR, dredgers, law enforcement |
+| Unknown | ⬜ Grey | All other codes | Unclassified or unspecified vessel types |
+
+> ℹ️ AIS ship type codes follow the ITU-R M.1371 standard. Classification logic is in `src/voyageintel/vessels/classifier.py`. Military vessels are additionally detected by MMSI Maritime Identification Digits for flag state and name pattern matching (USS, HMS, HMAS, etc.).
+
+---
+
 ## MCP Client Setup
 
 VoyageIntel exposes 25+ MCP tools via **two transports**:
@@ -257,6 +289,8 @@ VoyageIntel exposes 25+ MCP tools via **two transports**:
 |-----------|-------------|---------|
 | **Streamable HTTP** (`/mcp`) | Client connects to a running VoyageIntel server | Claude Code, VS Code, Cursor |
 | **stdio** | MCP client spawns `voyageintel` as a child process | Claude Desktop |
+
+> ℹ️ The MCP server is currently available for **local use only** — it is not remotely hosted. You must run `voyageintel serve` locally, or deploy your own instance.
 
 ### Claude Desktop ✅ Tested
 
@@ -423,16 +457,16 @@ For directions, places, distance matrix, and elevation — connect Google's offi
 
 ---
 
-### Remote / Cloud Deployment
+### Self-Hosted Remote Deployment
 
-If VoyageIntel is deployed on a cloud platform (e.g. Railway), remote MCP clients can connect directly:
+If you deploy your own VoyageIntel instance on a cloud platform (e.g. Railway, Render, Fly.io), remote MCP clients can connect to it directly:
 
 **VS Code / Cursor:**
 ```json
 {
   "servers": {
     "voyageintel": {
-      "url": "https://voyageintel.dev/mcp"
+      "url": "https://your-deployment-url.example.com/mcp"
     }
   }
 }
@@ -440,7 +474,7 @@ If VoyageIntel is deployed on a cloud platform (e.g. Railway), remote MCP client
 
 **Claude Code:**
 ```bash
-claude mcp add voyageintel --transport http https://voyageintel.dev/mcp
+claude mcp add voyageintel --transport http https://your-deployment-url.example.com/mcp
 ```
 
 ---
@@ -514,7 +548,7 @@ voyageintel mcp-config --vscode     # VS Code / Cursor (HTTP)
 
 | Decision | Choice | Why |
 |----------|--------|-----|
-| **Single globe, multiple domains** | Flights + vessels + satellites on one CesiumJS viewer | Core value prop — unified situational awareness. Toggle chips let users show/hide each domain |
+| **Single globe, multiple domains** | Flights + vessels + satellites on one CesiumJS viewer | Core value prop — unified situational awareness. Navbar dropdown menus let users show/hide each domain |
 | **WebSocket for AIS, HTTP polling for flights** | Persistent WebSocket to aisstream.io, 60s HTTP polling for ADSB.lol | AIS is a real-time stream (~300 msg/sec). ADSB.lol doesn't offer WebSocket — polling at 60s balances freshness with API courtesy |
 | **Upsert for vessels, append for flights** | Different storage strategies per domain | Vessels send frequent position updates on same MMSI — upsert keeps DB lean. Flights are snapshot-based — append + prune |
 | **Batched AIS writes** | Buffer + flush every 1–2s | Individual INSERTs at ~300 msg/sec would bottleneck SQLite. Batching amortizes write cost into one transaction per flush |
@@ -548,7 +582,7 @@ The heavy `PromptInjection` scanner (~738MB) and `NoRefusal` scanner (~827MB) we
 
 **Aircraft** — Detected via ICAO hex ranges, callsign prefixes, squawk codes, and the ADSB.lol `/v2/mil` feed. Private jets detected via known ICAO type codes. See `src/voyageintel/flights/classifier.py`.
 
-**Vessels** — Classified by AIS ship type codes (0-99) mapped to categories (cargo, tanker, passenger, military, fishing, recreational, special, high_speed). Military vessels additionally detected by name patterns (USS, HMS, HMAS, etc.). Flag state derived from MMSI Maritime Identification Digits. See `src/voyageintel/vessels/classifier.py`.
+**Vessels** — Classified by AIS ship type codes (0–99) mapped to categories (cargo, tanker, passenger, military, fishing, recreational, special, high_speed). Military vessels additionally detected by name patterns (USS, HMS, HMAS, etc.). Flag state derived from MMSI Maritime Identification Digits. See `src/voyageintel/vessels/classifier.py`.
 
 ---
 
@@ -557,7 +591,7 @@ The heavy `PromptInjection` scanner (~738MB) and `NoRefusal` scanner (~827MB) we
 | Source | Used For | Auth | Transport | Notes |
 |--------|----------|------|-----------|-------|
 | **ADSB.lol** | Global flight data, military feed, on-demand queries | None | HTTP REST (polling + on-demand) | Crowdsourced — coverage depends on volunteer feeder density |
-| **aisstream.io** | Real-time AIS vessel positions + static data | API key (free, GitHub login) | WebSocket (persistent stream) | ~300 msg/sec globally. Batched writes to SQLite |
+| **aisstream.io** | Real-time AIS vessel positions + static data | API key (free, GitHub login) | WebSocket (persistent stream) | Terrestrial receivers only — ~50–70 nm from shore. ~300 msg/sec globally. Batched writes to SQLite |
 | **Celestrak** | Satellite TLE orbital data (6 categories) | None | HTTP REST (hourly poll) | |
 | **hexdb.io** | Aircraft metadata + route lookup | None | HTTP REST (cached 30d/7d) | Can go down intermittently. Errors handled gracefully |
 | **World Port Index** | Port names, coordinates, codes (~400 ports) | None | Static dataset (bundled JSON) | Loaded into SQLite on first boot |
@@ -608,8 +642,12 @@ Auto-refreshes every 15 seconds. Dark theme, card-based grid, fully responsive.
 ## Web UI Guide
 
 - **Globe** — Rotate, zoom, and pan the 3D globe. Flights, vessels, and satellites render in real-time.
-- **Toggle chips** — Enable/disable flight types (Commercial, Military, Private), vessel types (Cargo, Tanker, Passenger, Naval, Fishing, Recreational), and satellite categories.
-- **Click to inspect** — Click any flight, vessel, or satellite for a detail panel with metadata, weather, and route info.
+- **Navbar dropdown menus** — **Flights ▾**, **Satellites ▾**, and **Vessels ▾** dropdown menus in the navigation bar. Each dropdown contains checkboxes to toggle individual sub-types (e.g. Commercial, Military, Private under Flights; Cargo, Tanker, Passenger, Naval, Fishing, Recreational under Vessels). Use **Show All** / **Hide All** buttons at the top of each dropdown for bulk toggling. Click outside the dropdown to close it.
+- **Click to inspect** — Click any flight, vessel, or satellite for a detail panel. Vessel detail panels show identity (name, MMSI, IMO, flag state), motion (speed, heading, course), dimensions, voyage info (destination, ETA, draught), and sea weather at the vessel's position.
+- **Status bar** — Unified domain breakdown across all tracking domains:
+  ```
+  ✈ 9,335 ⚔ 127 🔒 974 | 🚢 8,231 ⚓ 42 🎣 1,890 | 🛰 346 | 🛰 Track ISS
+  ```
 - **Track ISS** — Click the 🛰 Track ISS button in the status bar to rotate the globe to the ISS.
 - **Layers** — Switch between Dark, Satellite, Streets, and Terrain (terrain requires free Cesium Ion token).
 - **Share** — Snapshot your current view and share via URL or Web Share API.
@@ -711,12 +749,12 @@ VoyageIntel uses a tool-calling architecture where the LLM makes multiple API ca
 | Claude Desktop MCP integration | ✅ Tested |
 | Claude Code MCP integration | ✅ Tested |
 | VS Code + GitHub Copilot MCP integration | ✅ Tested |
-| Unified globe — vessels on 3D globe | 🔜 Phase 4 |
-| Vessel detail panel (click-to-inspect) | 🔜 Phase 4 |
-| Navbar dropdowns + status bar redesign | 🔜 Phase 4 |
-| Playground — maritime metrics | 🔜 Phase 5 |
-| PyPI publication (`pip install voyageintel`) | 🔜 Phase 5 |
-| Railway deployment (`voyageintel.dev`) | 🔜 Phase 5 |
+| Vessels on CesiumJS globe (BillboardCollection, 9 icon silhouettes) | ✅ Done |
+| Vessel detail panel (click-to-inspect: identity, motion, dimensions, voyage, sea weather) | ✅ Done |
+| Navbar dropdowns (Flights ▾, Satellites ▾, Vessels ▾ with checkboxes + Show All/Hide All) | ✅ Done |
+| Unified status bar (full domain breakdown counts) | ✅ Done |
+| PyPI publication (`pip install voyageintel`) | ✅ Done |
+| Railway deployment ([voyage.skyintel.dev](https://voyage.skyintel.dev)) | ✅ Done |
 | Guardrails branch | 🔜 Planned |
 | Vessel trails (last 30 min track) | 🔜 Planned |
 | Port activity monitor (arrivals/departures) | 🔜 Planned |
@@ -725,18 +763,20 @@ VoyageIntel uses a tool-calling architecture where the LLM makes multiple API ca
 | Sub-sea intelligence layer | 🔮 Future |
 | Anomaly detection (unusual routes, AIS gaps) | 🔮 Future |
 | Sanctions vessel list integration | 🔮 Future |
+| Satellite AIS integration (Spire, exactEarth, ORBCOMM) | 🔮 Future |
 
 ---
 
 ## Relationship to SkyIntel
 
-VoyageIntel is forked from [SkyIntel](https://github.com/0xchamin/skyintel) (`pip install skyintel`, `skyintel.dev`) — an air + space tracking platform. VoyageIntel is the superset: everything SkyIntel does, plus maritime (AIS vessel tracking, ports, marine weather) and future sub-sea intelligence.
+VoyageIntel is the evolution of [SkyIntel](https://github.com/0xchamin/skyintel/tree/railway) (`pip install skyintel`, `skyintel.dev`) — an air + space tracking platform. VoyageIntel is the superset: everything SkyIntel does, plus maritime (AIS vessel tracking, ports, marine weather) and future sub-sea intelligence.
 
 | Aspect | SkyIntel | VoyageIntel |
 |--------|----------|-------------|
 | **Scope** | Air + Space | Air + Sea + Space (+ future sub-sea) |
 | **Package** | `pip install skyintel` | `pip install voyageintel` |
-| **Domain** | `skyintel.dev` | `voyageintel.dev` |
+| **Domain** | `skyintel.dev` | `voyage.skyintel.dev` |
+| **Branch** | `railway` | `voyageintel` (default) |
 | **Port** | 9096 | 9097 |
 | **Config prefix** | `SKYINTEL_` | `VI_` |
 | **MCP tools** | 15 (air + space) | 25+ (air + sea + space + cross-domain) |
@@ -805,7 +845,7 @@ All data is sourced from **publicly available open APIs** — no classified, pro
 - Military vessel detection is based on AIS type codes and name patterns. Many military vessels disable or limit AIS transmission.
 - Aircraft classification (military/private/commercial) and vessel classification are based on known patterns and heuristics — for educational purposes only.
 - ADSB.lol coverage depends on volunteer ADS-B feeder density — some regions have limited coverage.
-- AIS coverage depends on aisstream.io's receiver network and the willingness of vessels to broadcast.
+- AIS coverage depends on aisstream.io's terrestrial receiver network (~50–70 nm from shore). Mid-ocean vessels are not visible. Satellite AIS is not currently integrated.
 - LLM-generated reports and analyses are AI-assisted and should not be used as sole sources for operational, safety, or security decisions.
 - BYOK API keys are stored in browser localStorage only — never persisted server-side.
 
